@@ -195,10 +195,19 @@ analysis report; the old generated result directory is not in this checkout.
 Do not compare its accuracy directly with chr21 because the regions and scored
 truth variants differ.
 
-The latest HG002 chr21 run generated exactly matching 7,274-record call sets.
-In the GIAB confident bases, both implementations had 3 true positives, 13
-false positives, and 12 false negatives (precision 0.1875, recall 0.20, and F1
-0.1935). The requested interval is 1 Mb, but the confident BED covers only
+A second chr21 interval, `chr21:20000000-21000000`, was evaluated with the
+same versions and two-thread settings. Its GIAB confident BED covered 976,775
+bases; both pipelines generated identical 2,706-record callsets and scored
+2,392 TP, 3 FP, and 7 FN (F1 0.9979). This indicates the earlier low chr21
+score is specific to that poorly covered interval, while validating this
+workflow only for the new region and configuration. The run artifacts are in
+`results/HG002_chr21_20000000_21000000_comparison/`.
+
+The earlier chr21 `10,000,000-11,000,000` run generated exactly matching
+7,274-record callsets. In the GIAB confident bases, both implementations had
+3 true positives, 13 false positives, and 12 false negatives (precision
+0.1875, recall 0.20, and F1 0.1935). The requested interval is 1 Mb, but
+the confident BED covers only
 18,381 bp (1.84%); 15 truth variants are scored there. This supports wrapper
 parity for this run, while the low scores and narrow evaluation mask do not
 support a broad accuracy claim.

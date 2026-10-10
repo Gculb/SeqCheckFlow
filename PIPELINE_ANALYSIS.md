@@ -2,30 +2,32 @@
 
 ## Scope and current evidence
 
-This report covers two separate analyses. The current HG002 benchmark compares
-direct command-line tools with SeqCheckFlow wrappers on GRCh38
-`chr21:10000000-11000000`. The RNA-seq section summarizes the completed raw-read
-reanalysis of GEO GSE52778. These are project examples, not a combined study.
+This report covers two separate analyses. The HG002 benchmarks compare
+direct command-line tools with SeqCheckFlow wrappers across two separate
+GRCh38 chr21 intervals; the earlier chr20 run is retained as historical
+context. The RNA-seq section summarizes the completed raw-read reanalysis of GEO GSE52778. These are project examples, not a combined study.
 
-The current chr21 figures and tables are updated from
-`results/HG002_chr21_comparison/comparison.json` and its RTG vcfeval reports.
-A separate historical chr20 summary and its figures are retained below; its
-raw generated result directory is not available in this checkout.
+The chr21 figures and tables are updated from the local RTG vcfeval reports
+for `results/HG002_chr21_comparison/` and
+`results/HG002_chr21_20000000_21000000_comparison/`. A separate historical
+chr20 summary and its figures are retained below; its raw generated result
+directory is not available in this checkout.
 The RNA-seq figures are from the eight-library run described below. Result
 directories are local generated artifacts and are ignored by Git.
 
 ## Executive summary
 
-- The direct-tool and SeqCheckFlow runs generated exactly matching variant
-  records: 7,274 records in each VCF, with identical non-header records.
-  This supports implementation parity for this run.
-- RTG vcfeval reported low accuracy for both call sets in the evaluated
-  confident bases: 3 true positives, 13 false positives, and 12 false
-  negatives (F1 = 0.1935). The benchmark interval is 1 Mb, but the GIAB
-  confident-region BED covers only 18,381 bp (1.84%); 15 of the 16 truth VCF
-  records overlap those scored bases. Most calls were outside the BED and were
-  not scored. Treat this as a narrow diagnostic result, not a representative
-  chromosome-wide accuracy estimate.
+- In both chr21 intervals, the direct-tool and SeqCheckFlow callsets had
+  identical non-header VCF records (7,274 in the low-coverage interval and
+  2,706 in the high-coverage interval), supporting implementation parity.
+- In chr21:10,000,000–11,000,000, both callsets scored F1 = 0.1935 (3 TP,
+  13 FP, 12 FN), but the benchmark BED covers only 18,381 bp (1.84%) and only
+  15 truth variants were scored. Most calls were outside the BED.
+- In the separate chr21:20,000,000–21,000,000 interval, both callsets scored
+  F1 = 0.9979 (2,392 TP, 3 FP, 7 FN) across 976,775 benchmark bases and 2,399
+  scored truth variants. The exact paired outputs and strong result show that
+  the first chr21 score is region-specific evidence, not evidence that the
+  entire workflow is broadly inaccurate.
 - One measured wrapped run took 17.0 seconds longer (+1.49%) and had 11.1 MiB
   more peak sampled process-tree RSS than the direct baseline. A single run
   cannot establish a performance difference.
@@ -131,6 +133,46 @@ Headers and serialization details can differ; the comparison above checks the
 actual non-header variant records. Matching output supports wrapper parity,
 not a claim that either calling workflow is clinically validated or generally
 accurate.
+
+## HG002 chr21 high-coverage regional rerun
+
+To determine whether the low score in the earlier chr21 interval reflected the
+whole workflow, we ran the same two-thread BWA 0.7.17, samtools 1.20, and GATK
+4.5.0.0 baseline and SeqCheckFlow-wrapper pipelines on
+`chr21:20000000-21000000`. The GIAB confident BED covers 976,775 of the requested
+1,000,000 bases (97.68%) across 132 intervals. RTG scored 2,399 truth variants
+in those bases.
+
+| Measure | Direct baseline | SeqCheckFlow wrappers |
+| --- | ---: | ---: |
+| Non-header VCF records | 2,706 | 2,706 |
+| Exact non-header record parity | Yes | Yes |
+| True positives | 2,392 | 2,392 |
+| False positives | 3 | 3 |
+| False negatives | 7 | 7 |
+| Precision | 0.9987 | 0.9987 |
+| Sensitivity / recall | 0.9971 | 0.9971 |
+| F1 | 0.9979 | 0.9979 |
+| Wall time (one run) | 674.26 s | 759.01 s |
+
+![HG002 chr21 F1 by region, with evaluated benchmark bases and truth counts](docs/images/hg002-chr21-region-accuracy.svg)
+
+**Why this graph:** the paired bars show that the implementations agree within
+each interval, while the annotations expose how different the evaluation
+denominators are. The large F1 change between chr21 windows is not evidence of
+a software change or a caller-to-caller comparison: it reflects two distinct
+sets of genomic loci, with different benchmark coverage and truth variants.
+The first interval has too few scored variants for a stable broad conclusion;
+the second is much more informative and shows strong accuracy for this sample,
+reference, tool configuration, and interval. The one-run timing difference is
+descriptive only.
+
+This result supports that the standard BWA/GATK workflow can achieve high
+accuracy in a well-covered chr21 region and that the wrappers reproduce the
+direct commands there. It does not establish accuracy across the whole
+chromosome or genome. For that, aggregate counts over multiple well-covered
+regions (or a whole-GIAB-confidence run), separate SNVs from indels, and inspect
+representative FP/FN loci as recommended in benchmarking guidance.
 
 ## Raw-read RNA-seq differential-expression analysis
 

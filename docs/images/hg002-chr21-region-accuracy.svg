@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="430" viewBox="0 0 900 430" role="img" aria-labelledby="title desc">
+<title id="title">HG002 chr21 accuracy by evaluated interval</title>
+<desc id="desc">Direct baseline and SeqCheckFlow wrapper F1 scores match within each region: 0.1935 for chr21 positions 10 to 11 million with 18,381 evaluated bases, and 0.9979 for positions 20 to 21 million with 976,775 evaluated bases.</desc>
+<style>text{font-family:Arial,sans-serif;fill:#172033}.title{font-size:23px;font-weight:700}.sub{font-size:14px;fill:#475569}.label{font-size:16px;font-weight:600}.small{font-size:13px;fill:#475569}.axis{stroke:#94a3b8;stroke-width:1}.base{fill:#2563eb}.wrap{fill:#f97316}.value{font-size:14px;font-weight:700}</style>
+<rect width="900" height="430" fill="#fff"/>
+<text x="52" y="44" class="title">HG002 chr21 accuracy depends on the evaluated interval</text>
+<text x="52" y="70" class="sub">Same BWA/GATK workflows and sample; distinct loci and GIAB evaluation coverage.</text>
+<rect x="585" y="88" width="14" height="14" class="base"/><text x="607" y="100" class="small">Direct baseline</text>
+<rect x="730" y="88" width="14" height="14" class="wrap"/><text x="752" y="100" class="small">SeqCheckFlow</text>
+<line x1="300" y1="126" x2="800" y2="126" class="axis"/>
+<line x1="300" y1="126" x2="300" y2="342" stroke="#e2e8f0"/><line x1="550" y1="126" x2="550" y2="342" stroke="#e2e8f0"/><line x1="800" y1="126" x2="800" y2="342" stroke="#e2e8f0"/>
+<text x="295" y="119" class="small">0</text><text x="541" y="119" class="small">0.5</text><text x="790" y="119" class="small">1.0 F1</text>
+<text x="52" y="170" class="label">chr21:10–11 Mb</text><text x="52" y="193" class="small">18,381 benchmark bases</text><text x="52" y="215" class="small">15 scored truth variants</text>
+<rect x="300" y="151" width="96.75" height="20" class="base"/><rect x="300" y="177" width="96.75" height="20" class="wrap"/><text x="408" y="168" class="value">F1 0.1935</text>
+<text x="52" y="279" class="label">chr21:20–21 Mb</text><text x="52" y="302" class="small">976,775 benchmark bases</text><text x="52" y="324" class="small">2,399 scored truth variants</text>
+<rect x="300" y="260" width="498.95" height="20" class="base"/><rect x="300" y="286" width="498.95" height="20" class="wrap"/><text x="700" y="278" class="value" fill="#fff">F1 0.9979</text>
+<text x="52" y="386" class="small">Paired results overlap within each region. Scores describe different loci and denominators; this is not a caller-to-caller comparison.</text>
+</svg>
