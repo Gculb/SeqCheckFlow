@@ -93,14 +93,15 @@ The HG002 confident BED has 29 disjoint intervals totaling 18,381 bp, only
 records fell outside those confident intervals; those calls are unscored, not
 false positives. Within the scored bases, 15 truth variants and 16 calls are
 represented in the TP/FP/FN counts; these small denominators make each metric
-sensitive to a few calls. The result
-therefore says two things: the wrappers reproduce the direct pipeline exactly
-here, and both call sets perform poorly in the small portion where accuracy
-could be assessed. It does not identify the cause of the misses or extra
-calls. A follow-up should select a region with substantially more GIAB
-confident coverage, inspect the discordant loci and read evidence, and then
-repeat across independent regions before drawing a broader accuracy
-conclusion.
+sensitive to a few calls. The result says the wrappers reproduce the direct pipeline exactly in this
+run, while the calls disagree with truth at many of the few scored loci. The
+small BED coverage explains why this result cannot represent the whole 1 Mb
+window or chromosome; it does not, by itself, explain the observed errors. The
+current data do not establish whether those errors stem from local sequence or
+read-mapping context, read coverage, variant representation, or another input
+or workflow issue. Establishing that requires inspecting the FP/FN loci against
+the reads and alignment metrics. The high-coverage chr21 rerun below shows that
+the same configured workflow performs strongly in a different interval.
 
 ### Runtime, memory, and stage profile
 
@@ -173,6 +174,60 @@ direct commands there. It does not establish accuracy across the whole
 chromosome or genome. For that, aggregate counts over multiple well-covered
 regions (or a whole-GIAB-confidence run), separate SNVs from indels, and inspect
 representative FP/FN loci as recommended in benchmarking guidance.
+
+## What explains the regional results—and what is still unknown
+
+The two chr21 runs used the same sample, reference assembly, pinned tool
+versions, two-thread setting, and direct-versus-wrapper design. In each window,
+the baseline and wrapper VCF records match exactly. The large accuracy
+difference is therefore a difference between the genomic intervals and their
+truth-scored loci, not a difference between the two implementations in these
+runs. The `chr21:10-11 Mb` BED covers 1.84% of the window and yields just 15
+scored truth variants; the `chr21:20-21 Mb` BED covers 97.68% and yields 2,399.
+The first denominator is too small to support a stable general estimate. Its
+low score is a real result for the scored loci, but it is not representative of
+the full window because nearly all bases and calls are outside the evaluation
+mask. Outside-mask calls are unscored, not false positives.
+
+Mask size is not a causal explanation for individual mismatches. We have not
+yet diagnosed the 13 FP and 12 FN in the first interval at read level. To
+explain those errors, inspect each discordant locus in the truth/call VCFs and
+aligned BAMs, recording depth, mapping quality, read support, local sequence
+context, and whether a nearby complex variant affects representation. A
+region-specific diagnosis should distinguish these observed facts from any
+hypothesized mechanism.
+
+### What a run should establish
+
+A result is interpretable when it records and checks all of the following:
+
+- **Input identity:** sample and paired-read identity; FASTQ validation; read
+  counts and quality; reference assembly and contig names; checksums for reads,
+  reference, known-sites, truth VCF, BED, and RTG SDF.
+- **Resource compatibility:** known-sites are a BQSR resource, while the truth
+  VCF and benchmark BED are evaluation resources. All must match the same
+  assembly and contig naming. The RTG SDF must be built from the exact reference
+  FASTA used by BWA and GATK.
+- **Coordinate agreement:** record that command-line intervals are 1-based
+  inclusive while BED uses 0-based half-open coordinates. Report the BED
+  overlap in bases and the number of truth variants and calls actually scored
+  before interpreting precision, recall, or F1.
+- **Execution evidence:** pinned container and tool versions, parameters,
+  stage exit status and logs, distinct output directory, per-stage outputs, and
+  final callset record parity for the direct and wrapped paths.
+- **Accuracy evidence:** truth-based TP/FP/FN counts and metrics across
+  multiple well-covered regions, preferably with SNVs and indels separated;
+  inspect representative errors. A single small interval is a diagnostic,
+  not a whole-genome accuracy estimate.
+- **Performance evidence:** repeated runs with controlled order and comparable
+  resource conditions. One timing or sampled-memory measurement is descriptive,
+  not a performance conclusion.
+
+Wrapper parity and pipeline accuracy answer separate questions. Exact matching
+between direct and wrapped callsets checks that SeqCheckFlow invokes the same
+workflow. RTG comparison with truth estimates accuracy only for the benchmark
+loci selected by the BED. Both are needed to make the kinds of claims made in
+this report.
 
 ## Raw-read RNA-seq differential-expression analysis
 

@@ -142,6 +142,43 @@ substantial. A separate stage-by-stage Nextflow DAG is run with
 `nextflow run hg002.nf -profile docker`; it produces pipeline stages and truth
 scores, but not the wrapper-versus-direct comparison table.
 
+### What each benchmark stage does
+
+| Stage | Purpose | What to establish or inspect |
+| --- | --- | --- |
+| Prepare HG002 region | Extract paired reads from the public indexed BAM and fetch the matching regional reference, known-sites VCF, GIAB truth VCF, confident-region BED, and RTG SDF. Read extraction includes 5-kb flanks and name-collates the regional BAM so mates stay paired. | Check `dataset.json` for the requested interval, resource paths, confident interval count, and input SHA-256 hashes. Preparation refuses to overwrite an existing directory. |
+| Reference setup | Copy the reference into each workflow output and create BWA indexes, a samtools `.fai`, and a GATK sequence dictionary. | Ensure FASTA, indexes, dictionary, and RTG SDF all derive from the same assembly and sequence. Contig names must match all inputs. |
+| FASTQ QC | Validate FASTQ structure and summarize read length and quality. | Confirm both mates are valid, correspond to the same sample, and have plausible read counts and quality. This summary does not prove adequate coverage at every locus. |
+| BWA-MEM alignment | Map paired reads to the reference and add a read group with sample/platform metadata. | Check alignment summaries, mapped fraction, coverage, and mapping quality, especially at discordant loci. |
+| SAM/BAM processing | Convert SAM to BAM, name-sort pairs, run `samtools fixmate`, coordinate-sort, mark duplicates, and index the duplicate-marked BAM. | Sorting order is required by downstream tools; fixmate prepares mate fields for duplicate marking. Duplicates are marked, not removed. Inspect stage logs and alignment QC. |
+| BQSR | GATK `BaseRecalibrator` models systematic base-quality error using the supplied known-sites VCF; `ApplyBQSR` applies those recalibration estimates. | Known-sites is a calibration resource, not the truth set. Confirm that it matches the reference and that both paired workflows use the same file and interval. |
+| Variant calling | GATK HaplotypeCaller examines the requested interval on the recalibrated BAM and emits a small-variant VCF. | Validate the VCF and inspect its sample, contig, coordinate range, and counts. This workflow does not establish clinical validity. |
+| Truth evaluation | RTG `vcfeval` compares each callset with the GIAB truth VCF, restricted to the supplied confident BED. | Report BED-covered bases, scored truth variants, scored calls, TP/FP/FN, precision, recall, and F1. Calls outside the BED are unscored, not false positives. |
+
+### Checks before interpreting a benchmark
+
+1. Confirm that reads, reference FASTA/SDF, known-sites, truth VCF, BED, and
+   interval refer to the same sample, assembly, and contig naming. In the
+   generic command, the user supplies these resources; the CLI does not prove
+   that the biological sample or assembly is correct.
+2. Preserve the `dataset.json`, comparison JSON, workflow JSON files, tool
+   versions, checksums, logs, and output VCFs. Use a new output directory for
+   every run; the runner intentionally refuses to overwrite existing results.
+3. Check the confident-region BED overlap and truth/call denominators before
+   reading the score. The command-line interval is 1-based inclusive; BED
+   coordinates are 0-based half-open.
+4. Treat exact baseline/wrapper VCF parity as a wrapper check. Treat RTG metrics
+   as accuracy evidence only for truth-scored bases. Compare several
+   well-covered regions, aggregate TP/FP/FN counts, separate SNVs and indels,
+   and inspect representative discordant loci for read depth, mapping quality,
+   read support, and local sequence context.
+5. Repeat runs under controlled conditions before making performance claims;
+   a single wall-time or sampled-memory value is descriptive only.
+
+For this project’s observed regional examples and the reason the chr21 scores
+differ, see the [analysis report](../PIPELINE_ANALYSIS.md). The recommended
+error review follows [GA4GH benchmarking best practices](https://pmc.ncbi.nlm.nih.gov/articles/PMC6699627/); see also [NIST's guidance on small targeted truth subsets](https://www.nist.gov/programs-projects/faqs-genome-bottle).
+
 ### Other organisms and user-supplied regions
 
 The generic `benchmark` command is not tied to HG002 or human chromosome
