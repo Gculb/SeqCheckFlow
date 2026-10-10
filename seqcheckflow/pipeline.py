@@ -1,7 +1,7 @@
 import argparse
 import os
 
-from .fasta import read_fasta, sequence_stats
+from .fasta import analyze_fasta
 from .qc import analyze_fastq_quality
 from .report import write_report
 from .validation import detect_sequence_format, validate_sequence_file
@@ -41,19 +41,7 @@ def run_pipeline(
         raise ValueError(f"Input validation failed for {input_file}:\n{details}")
 
     if file_format == "fasta":
-        sequences = read_fasta(input_file)
-        metrics = sequence_stats(sequences)
-        total_bases = sum(len(sequence) for sequence in sequences.values())
-        gc_bases = sum(
-            sequence.upper().count("G") + sequence.upper().count("C")
-            for sequence in sequences.values()
-        )
-        metrics.update(
-            {
-                "total_bases": total_bases,
-                "gc_content": (gc_bases / total_bases * 100) if total_bases else 0,
-            }
-        )
+        metrics = analyze_fasta(input_file)
     elif file_format == "fastq":
         metrics = analyze_fastq_quality(
             input_file, minimum_mean_quality=minimum_mean_quality

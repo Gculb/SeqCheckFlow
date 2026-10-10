@@ -1,6 +1,6 @@
 from collections import Counter
 
-from .fastq import read_fastq
+from .fastq import iter_fastq
 
 
 def analyze_fastq_quality(fastq_file, minimum_mean_quality=20):
@@ -14,7 +14,6 @@ def analyze_fastq_quality(fastq_file, minimum_mean_quality=20):
     if minimum_mean_quality < 0:
         raise ValueError("minimum_mean_quality must not be negative.")
 
-    reads = read_fastq(fastq_file)
     read_lengths = Counter()
     quality_distribution = Counter()
     total_bases = 0
@@ -23,21 +22,22 @@ def analyze_fastq_quality(fastq_file, minimum_mean_quality=20):
     low_quality_reads = 0
     total_quality = 0
 
-    for read in reads:
+    read_count = 0
+    for read in iter_fastq(fastq_file):
+        read_count += 1
         sequence = read["sequence"].upper()
-        quality_scores = [ord(character) - 33 for character in read["quality"]]
+        quality_score_sum = sum(ord(character) - 33 for character in read["quality"])
         read_lengths[len(sequence)] += 1
         total_bases += len(sequence)
         gc_bases += sequence.count("G") + sequence.count("C")
         ambiguous_bases += sum(base not in "ACGT" for base in sequence)
-        quality_distribution.update(quality_scores)
-        total_quality += sum(quality_scores)
+        quality_distribution.update(ord(character) - 33 for character in read["quality"])
+        total_quality += quality_score_sum
 
-        mean_read_quality = sum(quality_scores) / len(quality_scores) if quality_scores else 0
+        mean_read_quality = quality_score_sum / len(read["quality"]) if read["quality"] else 0
         if mean_read_quality < minimum_mean_quality:
             low_quality_reads += 1
 
-    read_count = len(reads)
     return {
         "read_count": read_count,
         "total_bases": total_bases,

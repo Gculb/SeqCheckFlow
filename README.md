@@ -47,7 +47,8 @@ HG002 region ──> hg002.nf / benchmark ──> calls ──> GIAB truth compa
 
 See [ARCHITECTURE.md](./ARCHITECTURE.md) for component responsibilities and
 workflow diagrams, and [DESIGN_NOTES.md](./DESIGN_NOTES.md) for file formats,
-metric interpretation, and implementation decisions.
+metric interpretation, and implementation decisions. The complete command and
+dependency reference is in [the user guide](./docs/USER_GUIDE.md).
 
 ## Example results and limits
 
@@ -78,37 +79,43 @@ These figures come from the eight-sample raw-read analysis:
 
 ## Quick start: inspect a local file
 
-Requires Python and the packages in [`requirements.txt`](./requirements.txt).
-Some formats also need external tools such as samtools; BAM/CRAM summaries
-require samtools installed on `PATH`.
+The recommended run path uses Docker Compose so the analysis dependencies come
+from the repository's pinned container instead of the host Python environment.
+Install Docker Desktop (or Docker Engine with the Compose plugin), start it, and
+install Python 3.10 or newer. Keep the input under this project directory so
+the container can access it.
 
 ```bash
-pip install -r requirements.txt
-python -m seqcheckflow.pipeline data/examples/example.fasta
+python scripts/seqcheckflow.py analyze data/examples/example.fasta
 ```
 
-The command writes JSON and text reports to `results/` by default. Substitute
-a local `.fastq`, `.vcf`, `.vcf.gz`, `.bam`, or `.cram` file to summarize another
-supported format. CRAM may require a matching reference:
+The first run builds the container; later runs reuse it. The command writes
+JSON and text reports to `results/` by default. Substitute a `.fastq`, `.vcf`,
+`.vcf.gz`, `.bam`, or `.cram` file to summarize another supported format.
+CRAM may require a matching reference:
 
 ```bash
-python -m seqcheckflow.pipeline data/alignments/sample.cram \
+python scripts/seqcheckflow.py analyze data/alignments/sample.cram \
   --reference data/references/reference.fasta
 ```
 
-Downloading is a separate step. For example, SRA FASTQ download uses the NCBI
-SRA Toolkit (`fasterq-dump`):
+Downloading is a separate step. The container includes the NCBI SRA Toolkit for
+SRA FASTQ downloads:
 
 ```bash
-python -m seqcheckflow.download fastq SRR123456 --threads 4
+python scripts/seqcheckflow.py download fastq SRR123456 --threads 4
 ```
+
+The launcher also provides `prepare-hg002` and `compare-hg002` commands. The
+full command reference, outputs, optional tools, and workflow prerequisites are
+documented in [the user guide](./docs/USER_GUIDE.md).
 
 ## Run the example workflows
 
 The Nextflow examples are optional, resource-intensive runs and require Java
 17, Nextflow 24.10.5, Docker, and a Linux environment (WSL2 is suitable on
-Windows). The direct HG002 comparison can also be run with Docker Compose in
-PowerShell as shown below. See
+Windows). The Docker Compose launcher also supports the direct HG002 comparison
+in PowerShell as shown below. See
 [the workflow and scaling notes](./ARCHITECTURE.md) before running larger data.
 
 Raw-read RNA-seq:
@@ -118,8 +125,15 @@ docker build -f containers/rnaseq.Dockerfile -t seqcheckflow-rnaseq:latest .
 nextflow run main.nf -profile docker \
   --samplesheet analysis/airway_samples.tsv \
   --threads 2 \
+  --max_forks 1 \
   --outdir results/rnaseq_airway
 ```
+
+`--threads` controls threads per fastp/Salmon task; `--max_forks` controls the
+maximum number of concurrent download, trimming, and quantification tasks.
+The default of 1 keeps peak resource use predictable. Increase it when the
+machine has enough memory and CPU; per-sample quantification remains
+independent, and the combined DESeq2 results are unchanged.
 
 The full run downloads multiple public FASTQ files and needs additional disk
 space for reads, trimmed files, and the Salmon index. It produces a MultiQC
@@ -133,12 +147,10 @@ not already present. Preparation writes to a new directory and will not
 overwrite existing data.
 
 ```powershell
-docker compose build seqcheckflow
-
 $prepared = "data/benchmark/giab_hg002_chr20"
 if (-not (Test-Path $prepared)) {
   $prepared = "data/benchmark/giab_hg002_chr20_rerun"
-  docker compose run --rm seqcheckflow python -m seqcheckflow.giab_data `
+  python scripts/seqcheckflow.py prepare-hg002 `
     --interval chr20:10000000-11000000 `
     --threads 2 `
     --output-dir $prepared
@@ -150,7 +162,7 @@ the GIAB truth set. Each comparison needs a new output directory:
 
 ```powershell
 $outdir = "results/HG002_chr20_comparison_rerun"
-docker compose run --rm seqcheckflow python -m seqcheckflow.full_benchmark `
+python scripts/seqcheckflow.py compare-hg002 `
   --read1 "$prepared/HG002_R1.fastq" `
   --read2 "$prepared/HG002_R2.fastq" `
   --reference-fasta "$prepared/chr20.fa" `

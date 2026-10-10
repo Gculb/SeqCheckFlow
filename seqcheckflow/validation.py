@@ -1,6 +1,6 @@
 import os
 
-from .fastq import read_fastq
+from .fastq import iter_fastq
 from .variants import analyze_vcf
 
 
@@ -43,11 +43,8 @@ def validate_sequence_file(filename, file_format=None):
     record_count = 0
     try:
         if file_format == "fastq":
-            records = read_fastq(filename)
-            record_count = len(records)
-            if not records:
-                errors.append("File contains no FASTQ records.")
-            for index, record in enumerate(records, start=1):
+            for index, record in enumerate(iter_fastq(filename), start=1):
+                record_count += 1
                 invalid_bases = sorted(set(record["sequence"].upper()) - NUCLEOTIDE_ALPHABET)
                 if not record["sequence"]:
                     errors.append(f"FASTQ record {index} has an empty sequence.")

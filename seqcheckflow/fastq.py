@@ -1,32 +1,33 @@
-def read_fastq(filename):
-    reads = []
-
+def iter_fastq(filename):
+    """Yield FASTQ records one at a time, keeping memory independent of file size."""
     with open(filename, "r", encoding="utf-8") as file_handle:
-        lines = [line.rstrip("\r\n") for line in file_handle]
+        record_number = 0
+        while True:
+            lines = [file_handle.readline() for _ in range(4)]
+            if not lines[0]:
+                return
+            if any(not line for line in lines):
+                raise ValueError("FASTQ file ends with an incomplete four-line record.")
+            record_number += 1
+            identifier, sequence, plus, quality = [line.rstrip("\r\n") for line in lines]
 
-    if len(lines) % 4:
-        raise ValueError("FASTQ file ends with an incomplete four-line record.")
+            if not identifier.startswith("@") or len(identifier) == 1:
+                raise ValueError(f"Invalid FASTQ identifier on record {record_number}.")
 
-    for index in range(0, len(lines), 4):
-        identifier, sequence, plus, quality = lines[index : index + 4]
-        record_number = index // 4 + 1
+            if not plus.startswith("+"):
+                raise ValueError(f"Invalid FASTQ separator on record {record_number}.")
 
-        if not identifier.startswith("@") or len(identifier) == 1:
-            raise ValueError(f"Invalid FASTQ identifier on record {record_number}.")
+            if len(sequence) != len(quality):
+                raise ValueError(
+                    f"Sequence and quality lengths do not match for {identifier}"
+                )
 
-        if not plus.startswith("+"):
-            raise ValueError(f"Invalid FASTQ separator on record {record_number}.")
+            yield {"id": identifier[1:], "sequence": sequence, "quality": quality}
 
-        if len(sequence) != len(quality):
-            raise ValueError(
-                f"Sequence and quality lengths do not match for {identifier}"
-            )
 
-        reads.append(
-            {"id": identifier[1:], "sequence": sequence, "quality": quality}
-        )
-
-    return reads
+def read_fastq(filename):
+    """Return all FASTQ records (convenience API for small files)."""
+    return list(iter_fastq(filename))
 
 def mean_read_length(reads):
     if not reads:

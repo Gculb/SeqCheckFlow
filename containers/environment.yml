@@ -11,3 +11,4 @@ dependencies:
   - bcftools=1.20
   - gatk4=4.5.0.0
   - rtg-tools=3.12.1
+  - sra-tools=3.2.1

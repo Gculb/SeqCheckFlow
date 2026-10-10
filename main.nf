@@ -3,12 +3,13 @@ nextflow.enable.dsl = 2
 params.outdir = "results/rnaseq_airway_raw"
 params.samplesheet = "${projectDir}/analysis/airway_samples.tsv"
 params.threads = 2
+params.max_forks = 1
 params.ensembl_release = "112"
 
 process DOWNLOAD_READS {
     container "seqcheckflow-rnaseq:latest"
     cpus 1
-    maxForks 1
+    maxForks params.max_forks
 
     input:
     tuple val(meta), val(run)
@@ -38,7 +39,7 @@ process DOWNLOAD_READS {
 process FASTP {
     container "seqcheckflow-rnaseq:latest"
     cpus params.threads
-    maxForks 1
+    maxForks params.max_forks
     publishDir "${params.outdir}/qc", mode: "copy", pattern: "*fastp.*"
 
     input:
@@ -101,7 +102,7 @@ process SALMON_INDEX {
 process SALMON_QUANT {
     container "seqcheckflow-rnaseq:latest"
     cpus params.threads
-    maxForks 1
+    maxForks params.max_forks
     publishDir "${params.outdir}/quant", mode: "copy", pattern: "*.quant.sf"
 
     input:
@@ -194,6 +195,9 @@ process DESEQ2 {
 }
 
 workflow {
+    if ((params.max_forks as Integer) < 1) {
+        error "max_forks must be a positive integer."
+    }
     def samplesheet = Channel.fromPath(params.samplesheet, checkIfExists: true)
     def salmon_samples = samplesheet
         .splitCsv(header: true, sep: '\t')
