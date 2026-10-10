@@ -187,18 +187,21 @@ implement either capability.
 
 ## Benchmark interpretation and limits
 
-The initial HG002 chr20 run generated matching 1,749-record call sets with
-1,582 true positives, 6 false positives, and 6 false negatives for each
-implementation in the evaluated confident regions (precision, recall, and F1
-were each 0.9962). Matching accuracy is expected because both paths invoke the
-same underlying tools with the same settings; the comparison checks wrapper
-parity, not a new algorithm's accuracy.
+The latest HG002 chr21 run generated exactly matching 7,274-record call sets.
+In the GIAB confident bases, both implementations had 3 true positives, 13
+false positives, and 12 false negatives (precision 0.1875, recall 0.20, and F1
+0.1935). The requested interval is 1 Mb, but the confident BED covers only
+18,381 bp (1.84%); 15 truth variants are scored there. This supports wrapper
+parity for this run, while the low scores and narrow evaluation mask do not
+support a broad accuracy claim.
 
-One run measured 327.71 seconds for the direct baseline and 302.35 seconds for
-the SeqCheckFlow wrappers. This is an observation, not a statistically supported
-speedup; repeated runs are needed to estimate variability. The benchmark is a
-regional small-variant pilot, not whole-genome testing, full GATK Best
-Practices, clinical validation, or biological interpretation.
+One measurement took 1,140.59 seconds for the direct baseline and 1,157.60
+seconds for the SeqCheckFlow wrappers, with 592.7 and 603.8 MiB peak sampled
+process-tree RSS. These are descriptive measurements, not evidence of a
+performance difference; repeated runs with controlled order are needed to
+estimate variability. The benchmark is a regional small-variant pilot, not
+whole-genome testing, full GATK Best Practices, clinical validation, or
+biological interpretation.
 
 For the project's biological and software question-and-answer guide, see
 [DESIGN_NOTES.md](./DESIGN_NOTES.md). User instructions and command examples

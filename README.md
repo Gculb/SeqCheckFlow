@@ -57,13 +57,13 @@ general performance, broad biological conclusions, or clinical validity.
 
 | Example | Observed result | What it supports—and what it does not |
 | --- | --- | --- |
-| HG002 chr20 pilot | On a 1 Mb region, direct-tool and SeqCheckFlow-wrapper runs each had 1,582 true positives, 6 false positives, and 6 false negatives (precision/recall/F1 = 0.9962). | Supports wrapper parity for this run. The observed 328 s vs 302 s and 584.5 vs 561.6 MiB are single-run measurements, not proven performance gains. |
+| HG002 chr21 pilot | On `chr21:10000000-11000000`, both runs produced identical 7,274-record VCFs. In GIAB confident bases, each had 3 TP, 13 FP, and 12 FN (precision 0.1875, recall 0.20, F1 0.1935). The BED covers 18,381 bp (1.84% of the interval). | Supports wrapper parity, not good absolute accuracy. The narrow confidence mask and 15 scored truth variants limit interpretation. One run measured 1,140.59 s vs 1,157.60 s and 592.7 vs 603.8 MiB; these are descriptive, not proven performance differences. |
 | Airway RNA-seq (GSE52778) | Eight raw-read libraries completed fastp and Salmon quantification; mapping rates were 92.3–93.9%. DESeq2 (`~ cell + dex`) found no genes below BH-adjusted `p < 0.05`. | Demonstrates a raw-read-to-analysis path. Four donors from one study are insufficient to interpret this as evidence of no treatment effect or to claim independent validation. |
 
 The HG002 run is a regional, two-thread pilot—not whole-genome or cohort
 validation. The RNA-seq example is an exploratory reanalysis of one public
 study—not a new biological discovery. See
-[HG002 chr20 results](./docs/images/hg002-accuracy-parity.svg),
+[HG002 chr21 results](./docs/images/hg002-accuracy-parity.svg),
 [RNA-seq QC](./docs/reports/airway-multiqc.html), and the
 [analysis report](./PIPELINE_ANALYSIS.md) for plots, methods, and caveats.
 

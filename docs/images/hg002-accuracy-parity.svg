@@ -1,38 +1,33 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="920" height="330" viewBox="0 0 920 330" role="img" aria-labelledby="title desc">
-  <title id="title">HG002 regional truth-set accuracy parity</title>
-  <desc id="desc">Direct-tool and SeqCheckFlow wrapper calls both have 99.62 percent precision, sensitivity, and F1 in one chromosome 20 pilot.</desc>
-  <rect width="920" height="330" fill="#ffffff"/>
-  <text x="36" y="42" font-family="Arial, sans-serif" font-size="23" font-weight="700" fill="#172b4d">HG002 chr20 truth-set accuracy</text>
-  <text x="36" y="70" font-family="Arial, sans-serif" font-size="14" fill="#526174">GIAB confident regions | one-megabase pilot | one run per implementation</text>
-  <rect x="594" y="91" width="14" height="14" rx="2" fill="#355c9a"/>
-  <text x="615" y="103" font-family="Arial, sans-serif" font-size="13" fill="#26354a">Direct-tool baseline</text>
-  <rect x="756" y="91" width="14" height="14" rx="2" fill="#24a18a"/>
-  <text x="777" y="103" font-family="Arial, sans-serif" font-size="13" fill="#26354a">SeqCheckFlow wrappers</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="390" viewBox="0 0 960 390" role="img" aria-labelledby="title desc">
+  <title id="title">HG002 chr21 truth-set metrics and wrapper parity</title>
+  <desc id="desc">In a one-megabase chromosome 21 run, direct tools and SeqCheckFlow produced identical variant records. RTG accuracy metrics were low and identical: precision 18.75 percent, sensitivity 20 percent, and F1 19.35 percent. Only 18,381 bases were in the confident evaluation regions.</desc>
+  <rect width="960" height="390" fill="#ffffff"/>
+  <text x="36" y="42" font-family="Arial, sans-serif" font-size="23" font-weight="700" fill="#172b4d">HG002 chr21 truth-set metrics</text>
+  <text x="36" y="70" font-family="Arial, sans-serif" font-size="14" fill="#526174">chr21:10–11 Mb | 18,381 confident bases (1.84%) | 15 truth variants scored</text>
+  <rect x="602" y="91" width="14" height="14" rx="2" fill="#355c9a"/>
+  <text x="623" y="103" font-family="Arial, sans-serif" font-size="13" fill="#26354a">Direct-tool baseline</text>
+  <rect x="770" y="91" width="14" height="14" rx="2" fill="#24a18a"/>
+  <text x="791" y="103" font-family="Arial, sans-serif" font-size="13" fill="#26354a">SeqCheckFlow wrappers</text>
   <text x="36" y="143" font-family="Arial, sans-serif" font-size="15" fill="#26354a">Precision</text>
   <text x="36" y="207" font-family="Arial, sans-serif" font-size="15" fill="#26354a">Sensitivity</text>
   <text x="36" y="271" font-family="Arial, sans-serif" font-size="15" fill="#26354a">F1 score</text>
   <g fill="#edf1f5">
-    <rect x="170" y="119" width="590" height="15" rx="4"/>
-    <rect x="170" y="138" width="590" height="15" rx="4"/>
-    <rect x="170" y="183" width="590" height="15" rx="4"/>
-    <rect x="170" y="202" width="590" height="15" rx="4"/>
-    <rect x="170" y="247" width="590" height="15" rx="4"/>
-    <rect x="170" y="266" width="590" height="15" rx="4"/>
+    <rect x="170" y="119" width="620" height="15" rx="4"/><rect x="170" y="138" width="620" height="15" rx="4"/>
+    <rect x="170" y="183" width="620" height="15" rx="4"/><rect x="170" y="202" width="620" height="15" rx="4"/>
+    <rect x="170" y="247" width="620" height="15" rx="4"/><rect x="170" y="266" width="620" height="15" rx="4"/>
   </g>
   <g>
-    <rect x="170" y="119" width="587.8" height="15" rx="4" fill="#355c9a"/>
-    <rect x="170" y="138" width="587.8" height="15" rx="4" fill="#24a18a"/>
-    <rect x="170" y="183" width="587.8" height="15" rx="4" fill="#355c9a"/>
-    <rect x="170" y="202" width="587.8" height="15" rx="4" fill="#24a18a"/>
-    <rect x="170" y="247" width="587.8" height="15" rx="4" fill="#355c9a"/>
-    <rect x="170" y="266" width="587.8" height="15" rx="4" fill="#24a18a"/>
+    <rect x="170" y="119" width="116.25" height="15" rx="4" fill="#355c9a"/><rect x="170" y="138" width="116.25" height="15" rx="4" fill="#24a18a"/>
+    <rect x="170" y="183" width="124" height="15" rx="4" fill="#355c9a"/><rect x="170" y="202" width="124" height="15" rx="4" fill="#24a18a"/>
+    <rect x="170" y="247" width="119.97" height="15" rx="4" fill="#355c9a"/><rect x="170" y="266" width="119.97" height="15" rx="4" fill="#24a18a"/>
   </g>
   <g font-family="Arial, sans-serif" font-size="12" fill="#26354a">
-    <text x="773" y="131">99.62%</text><text x="773" y="150">99.62%</text>
-    <text x="773" y="195">99.62%</text><text x="773" y="214">99.62%</text>
-    <text x="773" y="259">99.62%</text><text x="773" y="278">99.62%</text>
+    <text x="301" y="131">18.75%</text><text x="301" y="150">18.75%</text>
+    <text x="309" y="195">20.00%</text><text x="309" y="214">20.00%</text>
+    <text x="306" y="259">19.35%</text><text x="306" y="278">19.35%</text>
   </g>
-  <line x1="170" y1="294" x2="760" y2="294" stroke="#aab5c1"/>
+  <line x1="170" y1="294" x2="790" y2="294" stroke="#aab5c1"/>
   <text x="170" y="315" font-family="Arial, sans-serif" font-size="12" fill="#526174">0%</text>
-  <text x="730" y="315" font-family="Arial, sans-serif" font-size="12" fill="#526174">100%</text>
+  <text x="756" y="315" font-family="Arial, sans-serif" font-size="12" fill="#526174">100%</text>
+  <text x="36" y="349" font-family="Arial, sans-serif" font-size="13" fill="#26354a">Each: 3 TP, 13 FP, 12 FN. The 7,274-record call sets match exactly; most calls were outside the scored BED.</text>
 </svg>
