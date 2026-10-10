@@ -7,8 +7,10 @@ direct command-line tools with SeqCheckFlow wrappers on GRCh38
 `chr21:10000000-11000000`. The RNA-seq section summarizes the completed raw-read
 reanalysis of GEO GSE52778. These are project examples, not a combined study.
 
-The HG002 figures and tables below are updated from
+The current chr21 figures and tables are updated from
 `results/HG002_chr21_comparison/comparison.json` and its RTG vcfeval reports.
+A separate historical chr20 summary and its figures are retained below; its
+raw generated result directory is not available in this checkout.
 The RNA-seq figures are from the eight-library run described below. Result
 directories are local generated artifacts and are ignored by Git.
 
@@ -31,6 +33,31 @@ directories are local generated artifacts and are ignored by Git.
   Benjamini-Hochberg adjusted `p < 0.05` threshold for the dexamethasone term
   after including donor cell line in the model. With four donors, this does
   not demonstrate absence of a biological effect.
+
+## Earlier HG002 chr20 regional benchmark (historical result)
+
+The project previously ran the same direct-tool-versus-wrapper comparison on
+GRCh38 `chr20:10000000-11000000`. This is a separate regional run from the
+current chr21 benchmark below. The historical report recorded the following
+results; its generated `results/HG002_chr20_comparison/` files are not present
+in this checkout, so these values are preserved from the prior report rather
+than re-derived from the raw comparison artifacts.
+
+| Measure | Direct baseline | SeqCheckFlow wrappers | Historical observation |
+| --- | ---: | ---: | --- |
+| Wall time | 327.71 s | 302.35 s | One measurement was 25.36 s (7.7%) faster with wrappers. |
+| Peak sampled process-tree RSS | 584.5 MiB | 561.6 MiB | Wrapper run was 22.9 MiB lower in this measurement. |
+| Output size | 603,418,500 bytes | 603,418,541 bytes | 41-byte difference. |
+| Truth-set results | 1,582 TP, 6 FP, 6 FN | 1,582 TP, 6 FP, 6 FN | Precision, recall, and F1 were each 0.9962 for both. |
+
+![Historical HG002 chr20 truth-set metrics](docs/images/hg002-accuracy-parity-chr20.svg)
+
+![Historical HG002 chr20 runtime and sampled memory comparison](docs/images/hg002-runtime-memory-chr20.svg)
+
+These plots preserve what was reported for the earlier run. The chr20 and chr21
+metrics should not be interpreted as a change in accuracy: they cover different
+regions, with different truth variants and confident bases. The single timing
+and memory measurements also do not establish a general performance advantage.
 
 ## HG002 chr21 regional benchmark
 

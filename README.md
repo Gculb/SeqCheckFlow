@@ -57,13 +57,15 @@ general performance, broad biological conclusions, or clinical validity.
 
 | Example | Observed result | What it supports—and what it does not |
 | --- | --- | --- |
-| HG002 chr21 pilot | On `chr21:10000000-11000000`, both runs produced identical 7,274-record VCFs. In GIAB confident bases, each had 3 TP, 13 FP, and 12 FN (precision 0.1875, recall 0.20, F1 0.1935). The BED covers 18,381 bp (1.84% of the interval). | Supports wrapper parity, not good absolute accuracy. The narrow confidence mask and 15 scored truth variants limit interpretation. One run measured 1,140.59 s vs 1,157.60 s and 592.7 vs 603.8 MiB; these are descriptive, not proven performance differences. |
+| HG002 chr20 pilot (historical) | The prior `chr20:10000000-11000000` report recorded 1,582 TP, 6 FP, and 6 FN for each implementation (precision, recall, and F1 0.9962); wall time was 327.71 s direct and 302.35 s wrapped. | Preserves the earlier regional benchmark and its figures. Its raw generated result directory is not present in this checkout. Do not compare its accuracy directly with chr21: the regions and scored truth variants differ; the one timing measurement is not a performance claim. |
+| HG002 chr21 pilot (current) | On `chr21:10000000-11000000`, both runs produced identical 7,274-record VCFs. In GIAB confident bases, each had 3 TP, 13 FP, and 12 FN (precision 0.1875, recall 0.20, F1 0.1935). The BED covers 18,381 bp (1.84% of the interval). | Supports wrapper parity, not good absolute accuracy. The narrow confidence mask and 15 scored truth variants limit interpretation. One run measured 1,140.59 s vs 1,157.60 s and 592.7 vs 603.8 MiB; these are descriptive, not proven performance differences. |
 | Airway RNA-seq (GSE52778) | Eight raw-read libraries completed fastp and Salmon quantification; mapping rates were 92.3–93.9%. DESeq2 (`~ cell + dex`) found no genes below BH-adjusted `p < 0.05`. | Demonstrates a raw-read-to-analysis path. Four donors from one study are insufficient to interpret this as evidence of no treatment effect or to claim independent validation. |
 
 The HG002 run is a regional, two-thread pilot—not whole-genome or cohort
 validation. The RNA-seq example is an exploratory reanalysis of one public
 study—not a new biological discovery. See
-[HG002 chr21 results](./docs/images/hg002-accuracy-parity.svg),
+[historical HG002 chr20 results](./docs/images/hg002-accuracy-parity-chr20.svg),
+[current HG002 chr21 results](./docs/images/hg002-accuracy-parity.svg),
 [RNA-seq QC](./docs/reports/airway-multiqc.html), and the
 [analysis report](./PIPELINE_ANALYSIS.md) for plots, methods, and caveats.
 

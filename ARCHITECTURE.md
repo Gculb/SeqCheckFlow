@@ -187,6 +187,14 @@ implement either capability.
 
 ## Benchmark interpretation and limits
 
+The earlier chr20 regional run was reported with 1,582 TP, 6 FP, and 6 FN for
+both implementations (precision, recall, and F1 0.9962). Its one measured run
+was 327.71 seconds direct and 302.35 seconds wrapped, with 584.5 and 561.6 MiB
+peak sampled RSS. These historical figures and plots are retained in the
+analysis report; the old generated result directory is not in this checkout.
+Do not compare its accuracy directly with chr21 because the regions and scored
+truth variants differ.
+
 The latest HG002 chr21 run generated exactly matching 7,274-record call sets.
 In the GIAB confident bases, both implementations had 3 true positives, 13
 false positives, and 12 false negatives (precision 0.1875, recall 0.20, and F1
