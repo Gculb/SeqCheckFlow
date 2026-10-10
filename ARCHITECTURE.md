@@ -4,9 +4,10 @@ SeqCheckFlow is a bioinformatics project with three deliberately separate execut
 paths:
 
 1. A lightweight CLI that validates and summarizes one input file.
-2. An opt-in HG002 benchmark that prepares a known sample, aligns reads, calls
-   small variants, and measures calls/performance against a direct-tool
-   baseline and GIAB truth.
+2. An opt-in germline benchmark that accepts user-supplied reads, reference,
+   known-sites, and truth resources, then measures calls/performance against a
+   direct-tool baseline. A separate helper prepares public HG002 GRCh38
+   autosomal regions (chr1–chr22).
 3. Nextflow workflows for the staged HG002 variant benchmark and a raw-read
    paired-donor RNA-seq differential-expression analysis in R/DESeq2.
 
@@ -51,10 +52,10 @@ failure modes.
 | `seqcheckflow.download` | NCBI sequence search/download, SRA FASTQ conversion, and direct-URL VCF/BAM/CRAM downloads. |
 | `seqcheckflow.blast` | Submits remote NCBI BLAST requests and summarizes returned hits. |
 | `seqcheckflow.alignment` | Standalone alignment and SAM-to-BAM wrappers for BWA or minimap2. |
-| `seqcheckflow.giab_data` | Prepares the small regional HG002 benchmark inputs from public resources. |
-| `seqcheckflow.workflow` | Runs one germline workflow using either SeqCheckFlow wrappers or direct tool invocations and records stage metrics. |
-| `seqcheckflow.benchmark` | Uses RTG `vcfeval` to compare baseline/candidate VCF calls with a truth set. |
-| `seqcheckflow.full_benchmark` | Runs the two workflows, verifies comparable tool/stage sets, computes metric deltas, and writes the combined JSON report. |
+| `seqcheckflow.giab_data` | Prepares a small regional HG002 GRCh38 autosomal benchmark input set from public resources (chr1–chr22). |
+| `seqcheckflow.workflow` | Runs one paired-read germline workflow for the supplied sample, reference, and contig interval, using either SeqCheckFlow wrappers or direct tool invocations. |
+| `seqcheckflow.benchmark` | Uses RTG `vcfeval` to compare baseline/candidate VCF calls with a supplied truth set and confident regions. |
+| `seqcheckflow.full_benchmark` | Runs the two workflows on user-supplied compatible resources, computes metric deltas, and writes the combined JSON report. |
 | `containers/`, `compose.yaml` | Provide a Docker environment with pinned benchmark tool versions. |
 | `main.nf`, `analysis/airway_samples.tsv`, `analysis/rnaseq_airway_deseq2.R` | Download public paired FASTQs, run fastp and Salmon, aggregate QC/quantification summaries with MultiQC, and analyze gene-level differential expression with tximport/DESeq2. |
 | `hg002.nf` | Prepare the public GIAB inputs and run each alignment, processing, calling, QC, and truth-scoring stage as a separate Nextflow task. |
@@ -106,11 +107,12 @@ flowchart LR
     CandidateVCF --> Comparison
 ```
 
-The preparation step retrieves a chr20 interval from an indexed public BAM
-using a 5-kb flank and name-collates the regional BAM before paired FASTQ
-extraction. This keeps mates together without searching for mates across the
-whole remote BAM. The truth VCF/confident BED are evaluation resources; the
-Broad Mills/1000G known-sites VCF is a distinct resource used during BQSR.
+The preparation step retrieves a selected autosomal interval from an indexed
+public BAM using a 5-kb flank and name-collates the regional BAM before paired
+FASTQ extraction. This keeps mates together without searching for mates
+across the whole remote BAM. The truth VCF/confident BED are evaluation
+resources; the Broad Mills/1000G known-sites VCF is a distinct resource used
+during BQSR.
 
 `hg002.nf` models reference setup, paired FASTQ QC, BWA-MEM alignment,
 SAM-to-BAM conversion, name sorting, fixmate, coordinate sorting, duplicate
@@ -119,7 +121,11 @@ marking/indexing, BaseRecalibrator, ApplyBQSR, HaplotypeCaller, VCF QC, and RTG
 CLI invocations so Nextflow owns stage scheduling and reports. The separate
 `seqcheckflow.full_benchmark` command remains available to compare the wrappers with
 direct tool invocations. Public input preparation is uncached and currently
-limited to chr20.
+limited to GRCh38 autosomes chr1–chr22. The generic comparison command is
+independent of HG002 and chromosome naming when the user provides compatible
+reads, reference, known-sites VCF, RTG SDF, truth VCF, and confident-region BED.
+Those resources must use the same assembly and contig names. Arbitrary-species
+reference or truth resources are not downloaded automatically.
 
 ### Raw-read airway RNA-seq analysis
 

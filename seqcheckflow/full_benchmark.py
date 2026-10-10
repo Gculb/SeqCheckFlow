@@ -50,7 +50,7 @@ def compare_germline_workflows(
     truth_vcf,
     confident_regions_bed,
     output_dir,
-    sample_name="HG002",
+    sample_name="sample",
     threads=2,
 ):
     """Run direct-tool baseline and SeqCheckFlow wrapper workflows, then compare accuracy."""
@@ -183,7 +183,10 @@ def compare_germline_workflows(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Run SeqCheckFlow and direct-tool germline workflows and compare to GIAB truth."
+        description=(
+            "Run direct-tool and SeqCheckFlow germline workflows and compare "
+            "their calls with a supplied truth set."
+        )
     )
     parser.add_argument("--read1", required=True)
     parser.add_argument("--read2", required=True)
@@ -192,10 +195,10 @@ def main():
     parser.add_argument("--reference-sdf", required=True)
     parser.add_argument("--truth-vcf", required=True)
     parser.add_argument("--confident-regions", required=True)
-    parser.add_argument("--interval", default="chr20:10000000-11000000")
-    parser.add_argument("--sample-name", default="HG002")
+    parser.add_argument("--interval", required=True, help="Contig:start-end interval")
+    parser.add_argument("--sample-name", default="sample")
     parser.add_argument("--threads", type=int, default=2)
-    parser.add_argument("--output-dir", default="results/HG002_chr20_comparison")
+    parser.add_argument("--output-dir", default="results/benchmark")
     args = parser.parse_args()
 
     try:

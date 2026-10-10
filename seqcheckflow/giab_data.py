@@ -3,6 +3,7 @@ import gzip
 import hashlib
 import json
 import os
+import re
 import tempfile
 import urllib.error
 import urllib.request
@@ -21,8 +22,8 @@ GIAB_READS_BASE = (
 )
 TRUTH_VCF_NAME = "HG002_GRCh38_1_22_v4.2.1_benchmark.vcf.gz"
 CONFIDENT_BED_NAME = "HG002_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed"
-REFERENCE_URL = (
-    "https://hgdownload.soe.ucsc.edu/goldenPath/hg38/chromosomes/chr20.fa.gz"
+REFERENCE_URL_TEMPLATE = (
+    "https://hgdownload.soe.ucsc.edu/goldenPath/hg38/chromosomes/{contig}.fa.gz"
 )
 KNOWN_SITES_URL = (
     "https://storage.googleapis.com/gcp-public-data--broad-references/hg38/v0/"
@@ -100,6 +101,13 @@ def _read_extraction_region(contig, start, end):
     return f"{contig}:{padded_start}-{padded_end}"
 
 
+def _validate_giab_contig(contig):
+    if not re.fullmatch(r"chr(?:[1-9]|1[0-9]|2[0-2])", contig):
+        raise ValueError(
+            "HG002 preparation supports GRCh38 autosomes chr1 through chr22."
+        )
+
+
 def _extract_paired_fastq(samtools, threads, regional_bam, read1, read2):
     with tempfile.TemporaryDirectory(prefix="seqcheckflow-giab-") as temporary_directory:
         name_collated_bam = os.path.join(temporary_directory, "regional.name_collated.bam")
@@ -139,12 +147,11 @@ def _extract_paired_fastq(samtools, threads, regional_bam, read1, read2):
 
 
 def prepare_giab_region(output_dir, interval="chr20:10000000-11000000", threads=2):
-    """Prepare a small paired-read HG002 region from the public GIAB indexed BAM."""
+    """Prepare an HG002 GRCh38 autosomal interval from public GIAB resources."""
     if not isinstance(threads, int) or isinstance(threads, bool) or threads < 1:
         raise ValueError("threads must be a positive integer.")
     contig, start, end = _validate_interval(interval)
-    if contig != "chr20":
-        raise ValueError("This sample preparation recipe currently supports chr20 only.")
+    _validate_giab_contig(contig)
     output_dir = os.path.abspath(os.fspath(output_dir))
     if os.path.exists(output_dir):
         raise FileExistsError(f"GIAB data directory already exists: {output_dir}")
@@ -162,15 +169,15 @@ def prepare_giab_region(output_dir, interval="chr20:10000000-11000000", threads=
         f"{GIAB_BASE}/{CONFIDENT_BED_NAME}",
         os.path.join(output_dir, CONFIDENT_BED_NAME),
     )
-    bed_name = f"HG002_chr20_{start}_{end}.confident.bed"
+    bed_name = f"HG002_{contig}_{start}_{end}.confident.bed"
     confident_bed = os.path.join(output_dir, bed_name)
     confident_interval_count = _restrict_confident_regions(
         source_bed, confident_bed, contig, start, end
     )
 
-    reference_gzip = os.path.join(output_dir, "chr20.fa.gz")
-    _download(REFERENCE_URL, reference_gzip)
-    reference_fasta = os.path.join(output_dir, "chr20.fa")
+    reference_gzip = os.path.join(output_dir, f"{contig}.fa.gz")
+    _download(REFERENCE_URL_TEMPLATE.format(contig=contig), reference_gzip)
+    reference_fasta = os.path.join(output_dir, f"{contig}.fa")
     temporary_reference = f"{reference_fasta}.part"
     try:
         with gzip.open(reference_gzip, "rb") as source, open(
@@ -186,7 +193,7 @@ def prepare_giab_region(output_dir, interval="chr20:10000000-11000000", threads=
     samtools = require_executable("samtools")
     bcftools = require_executable("bcftools")
     rtg = require_executable("rtg")
-    reference_sdf = os.path.join(output_dir, "chr20.sdf")
+    reference_sdf = os.path.join(output_dir, f"{contig}.sdf")
     run_command([rtg, "format", "-o", reference_sdf, reference_fasta])
 
     region = f"{contig}:{start}-{end}"
@@ -278,20 +285,32 @@ def main():
         description="Prepare a region-sized public GIAB HG002 benchmark dataset."
     )
     parser.add_argument(
-        "--interval", default="chr20:10000000-11000000", help="GRCh38 interval"
+        "--interval",
+        default="chr20:10000000-11000000",
+        help="GRCh38 autosomal interval",
     )
     parser.add_argument("--threads", type=int, default=2)
     parser.add_argument(
-        "--output-dir", default="data/benchmark/giab_hg002_chr20"
+        "--output-dir",
+        default=None,
+        help=(
+            "Output directory (default: "
+            "data/benchmark/giab_hg002_<contig>_<start>_<end>)"
+        ),
     )
     args = parser.parse_args()
     try:
+        contig, start, end = _validate_interval(args.interval)
+        _validate_giab_contig(contig)
+        output_dir = args.output_dir or (
+            f"data/benchmark/giab_hg002_{contig}_{start}_{end}"
+        )
         report = prepare_giab_region(
-            args.output_dir, interval=args.interval, threads=args.threads
+            output_dir, interval=args.interval, threads=args.threads
         )
     except (FileExistsError, OSError, RuntimeError, ValueError) as exc:
         parser.error(str(exc))
-    report_path = os.path.join(os.path.abspath(args.output_dir), "dataset.json")
+    report_path = os.path.join(os.path.abspath(output_dir), "dataset.json")
     with open(report_path, "w", encoding="utf-8") as file_handle:
         json.dump(report, file_handle, indent=2, sort_keys=True)
         file_handle.write("\n")

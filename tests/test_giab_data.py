@@ -7,10 +7,18 @@ from seqcheckflow.giab_data import (
     _extract_paired_fastq,
     _read_extraction_region,
     _restrict_confident_regions,
+    _validate_giab_contig,
 )
 
 
 class GiabRegionPreparationTests(unittest.TestCase):
+    def test_accepts_other_hg38_autosomes_and_rejects_non_autosomes(self):
+        _validate_giab_contig("chr21")
+        with self.assertRaisesRegex(ValueError, "chr1 through chr22"):
+            _validate_giab_contig("chrX")
+        with self.assertRaisesRegex(ValueError, "chr1 through chr22"):
+            _validate_giab_contig("chr01")
+
     def test_collates_regional_alignments_before_writing_paired_fastqs(self):
         with tempfile.TemporaryDirectory() as directory:
             read1 = os.path.join(directory, "read1.fastq")

@@ -54,13 +54,14 @@ process SETUP_REFERENCE {
     path "reference_bundle"
 
     script:
+    def contig = params.interval.tokenize(":")[0]
     """
     mkdir reference_bundle
-    cp ${prepared}/chr20.fa reference_bundle/reference.fa
-    cp -a ${prepared}/chr20.sdf reference_bundle/reference.sdf
+    cp ${prepared}/${contig}.fa reference_bundle/reference.fa
+    cp -a ${prepared}/${contig}.sdf reference_bundle/reference.sdf
     cp ${prepared}/Mills.hg38.region.vcf.gz* reference_bundle/
     cp ${prepared}/HG002.truth.region.vcf.gz reference_bundle/truth.vcf.gz
-    cp ${prepared}/HG002_chr20_*.confident.bed reference_bundle/confident_regions.bed
+    cp ${prepared}/HG002_${contig}_*.confident.bed reference_bundle/confident_regions.bed
     bwa index reference_bundle/reference.fa
     samtools faidx reference_bundle/reference.fa
     gatk CreateSequenceDictionary \\
@@ -292,9 +293,10 @@ process SCORE_VARIANTS {
 }
 
 workflow {
-    def interval_match = params.interval =~ /^chr20:(\d+)-(\d+)$/
-    if (!interval_match.matches()) {
-        error "The HG002 workflow supports intervals in chr20:start-end format."
+    def interval_match = params.interval =~ /^chr([1-9]|1[0-9]|2[0-2]):(\d+)-(\d+)$/
+    if (!interval_match.matches() || interval_match.group(2).toInteger() < 1 ||
+        interval_match.group(3).toInteger() < interval_match.group(2).toInteger()) {
+        error "The HG002 workflow supports ordered GRCh38 autosomal intervals chr1-chr22:start-end."
     }
 
     def threads = params.threads as Integer

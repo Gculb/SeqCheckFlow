@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from seqcheckflow.workflow import run_germline_workflow
+from seqcheckflow.workflow import _validate_interval, run_germline_workflow
 
 
 def make_fastq(filename, sequence="ACGT"):
@@ -18,6 +18,12 @@ def make_file(filename, content=b"fixture"):
 
 
 class GermlineWorkflowTests(unittest.TestCase):
+    def test_interval_accepts_custom_species_contig_names(self):
+        self.assertEqual(
+            _validate_interval("scaffold_21:100000-200000"),
+            ("scaffold_21", 100000, 200000),
+        )
+
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp_dir.cleanup)
@@ -27,7 +33,7 @@ class GermlineWorkflowTests(unittest.TestCase):
         self.known_sites = os.path.join(self.temp_dir.name, "known_sites.vcf.gz")
         make_fastq(self.read1)
         make_fastq(self.read2, "TGCA")
-        make_file(self.reference, b">chr20\nACGT\n")
+        make_file(self.reference, b">chr21\nACGT\n")
         make_file(self.known_sites, b"known sites")
 
     def _mock_common_tools(self):
@@ -115,8 +121,9 @@ class GermlineWorkflowTests(unittest.TestCase):
                 self.read2,
                 self.reference,
                 self.known_sites,
-                "chr20:10000000-11000000",
+                "chr21:10000000-11000000",
                 output_dir,
+                sample_name="sample_21",
             )
 
         self.assertEqual(result["implementation"], "seqcheckflow")
@@ -129,7 +136,7 @@ class GermlineWorkflowTests(unittest.TestCase):
         )
         self.assertTrue(os.path.isfile(result["report_file"]))
         with open(result["report_file"], encoding="utf-8") as file_handle:
-            self.assertEqual(json.load(file_handle)["sample_name"], "HG002")
+            self.assertEqual(json.load(file_handle)["sample_name"], "sample_21")
         self.assertTrue(align.call_args.kwargs["read_group"].startswith("@RG\\t"))
         index_ref.assert_called_once()
 
@@ -170,7 +177,7 @@ class GermlineWorkflowTests(unittest.TestCase):
                 self.read2,
                 self.reference,
                 self.known_sites,
-                "chr20:10000000-11000000",
+                "chr21:10000000-11000000",
                 output_dir,
                 implementation="baseline",
             )
@@ -207,7 +214,7 @@ class GermlineWorkflowTests(unittest.TestCase):
                 self.read2,
                 self.reference,
                 self.known_sites,
-                "chr20:10000000-11000000",
+                "chr21:10000000-11000000",
                 existing,
             )
 

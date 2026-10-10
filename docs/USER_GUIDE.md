@@ -29,7 +29,8 @@ continuation; bash uses backslashes):
 | `python scripts/seqcheckflow.py analyze <file> [options]` | Validate and summarize one FASTA, FASTQ, VCF/VCF.GZ, BAM, or CRAM; emit JSON and text reports. |
 | `python scripts/seqcheckflow.py download <download-subcommand> ...` | Search/download NCBI sequence records, download SRA FASTQ, or fetch direct-URL VCF/BAM/CRAM files. |
 | `python scripts/seqcheckflow.py prepare-hg002 [options]` | Download and prepare a regional HG002 benchmark dataset. |
-| `python scripts/seqcheckflow.py compare-hg002 [options]` | Run the direct-tool and wrapper germline workflows, then compare their calls with GIAB truth. |
+| `python scripts/seqcheckflow.py benchmark [options]` | Run the direct-tool and SeqCheckFlow germline workflows on user-supplied data and compare calls with a supplied truth set. |
+| `python scripts/seqcheckflow.py compare-hg002 [options]` | Backward-compatible alias for `benchmark`. |
 
 The runner's `--build` behavior means a changed container definition is picked
 up on the next command. Use `docker compose build seqcheckflow` to build it
@@ -78,7 +79,7 @@ automatically feed the files to the analysis command.
 | BLAST | Optional remote NCBI BLAST search, exposed as a Python helper; not a standalone CLI command. | `seqcheckflow.blast` |
 | Alignment | Optional BWA/minimap2 alignment and SAM-to-BAM helper functions; not automatically part of single-file analysis. | `seqcheckflow.alignment` |
 | RNA-seq | Eight-sample ENA → fastp → Salmon → MultiQC and tximport/DESeq2 example. | `main.nf`, `analysis/` |
-| HG002 | Regional GIAB data preparation; wrapper-versus-direct-tool comparison; separate stage-by-stage Nextflow DAG. | `seqcheckflow.giab_data`, `seqcheckflow.full_benchmark`, `hg002.nf` |
+| HG002 | Regional GIAB preparation for GRCh38 autosomes chr1–chr22; wrapper-versus-direct-tool comparison; separate stage-by-stage Nextflow DAG. | `seqcheckflow.giab_data`, `seqcheckflow.full_benchmark`, `hg002.nf` |
 
 The separate `seqcheckflow.cli` entry point prints a basic FASTA/FASTQ summary.
 The documented `analyze` command is the report-producing interface and supports
@@ -112,34 +113,70 @@ Actions.
 ### HG002 regional benchmark
 
 The short Docker Compose launcher commands prepare inputs and compare both
-workflows. Preparation only happens if its output directory does not exist;
-comparison results refuse to overwrite an existing output directory. For a
-1 Mb chr20 run in PowerShell:
+workflows. The automatic HG002 downloader supports GRCh38 autosomes chr1–chr22;
+preparation refuses to overwrite an existing directory, as does comparison.
+For a 1 Mb chr21 run in PowerShell:
 
 ```powershell
-$prepared = "data/benchmark/giab_hg002_chr20"
+$prepared = "data/benchmark/giab_hg002_chr21_10000000_11000000"
 python scripts/seqcheckflow.py prepare-hg002 `
-  --interval chr20:10000000-11000000 --threads 2 --output-dir $prepared
+  --interval chr21:10000000-11000000 --threads 2 --output-dir $prepared
 
-$outdir = "results/HG002_chr20_comparison"
-python scripts/seqcheckflow.py compare-hg002 `
+$outdir = "results/HG002_chr21_comparison"
+python scripts/seqcheckflow.py benchmark `
   --read1 "$prepared/HG002_R1.fastq" `
   --read2 "$prepared/HG002_R2.fastq" `
-  --reference-fasta "$prepared/chr20.fa" `
+  --reference-fasta "$prepared/chr21.fa" `
   --known-sites-vcf "$prepared/Mills.hg38.region.vcf.gz" `
-  --reference-sdf "$prepared/chr20.sdf" `
+  --reference-sdf "$prepared/chr21.sdf" `
   --truth-vcf "$prepared/HG002.truth.region.vcf.gz" `
-  --confident-regions "$prepared/HG002_chr20_10000000_11000000.confident.bed" `
-  --interval chr20:10000000-11000000 --threads 2 --output-dir $outdir
+  --confident-regions "$prepared/HG002_chr21_10000000_11000000.confident.bed" `
+  --interval chr21:10000000-11000000 --sample-name HG002 --threads 2 --output-dir $outdir
 ```
 
-Input preparation queries public GIAB resources and is limited to a genomic
-region. The comparison runs BWA, samtools, GATK, bcftools, and RTG Tools in
+Input preparation queries public GIAB resources for a genomic region. The
+comparison runs BWA, samtools, GATK, bcftools, and RTG Tools in
 the pinned container and writes baseline/candidate outputs, stage manifests,
 truth-evaluation reports, and `comparison.json`. Disk/network requirements are
 substantial. A separate stage-by-stage Nextflow DAG is run with
 `nextflow run hg002.nf -profile docker`; it produces pipeline stages and truth
 scores, but not the wrapper-versus-direct comparison table.
+
+### Other organisms and user-supplied regions
+
+The generic `benchmark` command is not tied to HG002 or human chromosome
+names. Supply paired FASTQs, a reference FASTA, a matching known-sites VCF, an
+RTG reference SDF made from that FASTA, a truth VCF, and a confident-regions
+BED. The reference, VCFs, BED, reads, and `--interval` must use compatible
+assemblies and matching contig names. For example, the same code can benchmark
+a species whose reference uses `scaffold_21`:
+
+```bash
+docker compose run --build --rm seqcheckflow rtg format \
+  -o data/custom/reference.sdf data/custom/reference.fa
+
+python scripts/seqcheckflow.py benchmark \
+  --read1 data/custom/sample_R1.fastq \
+  --read2 data/custom/sample_R2.fastq \
+  --reference-fasta data/custom/reference.fa \
+  --known-sites-vcf data/custom/known_sites.vcf.gz \
+  --reference-sdf data/custom/reference.sdf \
+  --truth-vcf data/custom/truth.vcf.gz \
+  --confident-regions data/custom/confident_regions.bed \
+  --interval scaffold_21:100000-200000 \
+  --sample-name sample_1 --threads 2 \
+  --output-dir results/custom_species_region
+```
+
+The `contig:start-end` interval uses 1-based inclusive coordinates, as required
+by GATK and samtools region arguments. BED confident-region files use the BED
+0-based, half-open convention.
+
+The generic benchmark does not fetch arbitrary species data or choose truth
+sets for users; those resources need to be supplied and validated for the
+species and assembly. A truth VCF and confident BED are required for accuracy
+scores. The automated downloader remains a convenience recipe specifically
+for HG002 GRCh38 autosomes chr1–chr22.
 
 ## Runtime and dependency reference
 

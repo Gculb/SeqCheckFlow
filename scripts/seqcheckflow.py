@@ -11,6 +11,7 @@ COMMANDS = {
     "download": "seqcheckflow.download",
     "prepare-hg002": "seqcheckflow.giab_data",
     "compare-hg002": "seqcheckflow.full_benchmark",
+    "benchmark": "seqcheckflow.full_benchmark",
 }
 
 

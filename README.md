@@ -20,7 +20,7 @@ analyze every file type, or claim new biological findings.
 | `seqcheckflow.download` | Searches/downloads NCBI sequence records and SRA FASTQ; downloads VCF/BAM/CRAM from direct URLs. |
 | Standalone helpers | Optional alignment (BWA/minimap2), samtools operations, and remote NCBI BLAST. These are separate calls, not automatically chained by the single-file CLI. |
 | `main.nf` | Eight-library airway RNA-seq example: ENA FASTQ → fastp → Salmon, then MultiQC QC and tximport/DESeq2 in R. |
-| `hg002.nf` and benchmark commands | Staged, single-sample HG002 regional variant-calling example and wrapper-versus-direct-tool comparison. |
+| `hg002.nf` and benchmark commands | Staged HG002 GRCh38 autosomal region workflow plus a generic user-input wrapper-versus-direct-tool benchmark. |
 
 The CLI's reports are format-specific checks and measurements. It does **not**
 trim FASTQ reads, align reads, call variants, annotate variants, or interpret
@@ -106,11 +106,18 @@ SRA FASTQ downloads:
 python scripts/seqcheckflow.py download fastq SRR123456 --threads 4
 ```
 
-The launcher also provides `prepare-hg002` and `compare-hg002` commands. The
-full command reference, outputs, optional tools, and workflow prerequisites are
-documented in [the user guide](./docs/USER_GUIDE.md).
+The launcher also provides `prepare-hg002` and the generic `benchmark`
+command (`compare-hg002` remains an alias). The full command reference,
+outputs, optional tools, and workflow prerequisites are documented in
+[the user guide](./docs/USER_GUIDE.md).
 
 ## Run the example workflows
+
+The HG002 data-preparation command can target any GRCh38 autosome from chr1 to
+chr22, including chr21. The generic `benchmark` command can use another
+organism when you provide compatible reads, reference, known-sites, truth, and
+confident-region files. See [the user guide](./docs/USER_GUIDE.md) for a chr21
+example and a custom-species command.
 
 The Nextflow examples are optional, resource-intensive runs and require Java
 17, Nextflow 24.10.5, Docker, and a Linux environment (WSL2 is suitable on

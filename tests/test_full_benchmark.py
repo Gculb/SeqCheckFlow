@@ -79,10 +79,11 @@ class FullBenchmarkTests(unittest.TestCase):
                     reference,
                     known_sites,
                     reference_sdf,
-                    "chr20:10000000-11000000",
+                    "chr21:10000000-11000000",
                     truth,
                     bed,
                     output,
+                    sample_name="sample_21",
                 )
 
             self.assertEqual(run_workflow.call_count, 2)
@@ -95,7 +96,9 @@ class FullBenchmarkTests(unittest.TestCase):
             )
             self.assertEqual(result["truth_evaluation"], evaluation)
             with open(result["report_file"], encoding="utf-8") as file_handle:
-                self.assertEqual(json.load(file_handle)["region"], "chr20:10000000-11000000")
+                saved_report = json.load(file_handle)
+                self.assertEqual(saved_report["region"], "chr21:10000000-11000000")
+                self.assertEqual(saved_report["sample"], "sample_21")
 
 
 if __name__ == "__main__":

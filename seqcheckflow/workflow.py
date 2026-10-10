@@ -203,7 +203,7 @@ def run_germline_workflow(
     known_sites_vcf,
     interval,
     output_dir,
-    sample_name="HG002",
+    sample_name="sample",
     threads=2,
     implementation="seqcheckflow",
 ):
