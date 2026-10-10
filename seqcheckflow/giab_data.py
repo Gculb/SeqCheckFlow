@@ -260,7 +260,7 @@ def prepare_giab_region(output_dir, interval="chr20:10000000-11000000", threads=
         "source_alignment_url": source_bam,
         "source_truth_vcf_url": f"{GIAB_BASE}/{TRUTH_VCF_NAME}",
         "source_truth_bed_url": f"{GIAB_BASE}/{CONFIDENT_BED_NAME}",
-        "source_reference_url": REFERENCE_URL,
+        "source_reference_url": REFERENCE_URL_TEMPLATE.format(contig=contig),
         "source_known_sites_url": KNOWN_SITES_URL,
         "source_alignment_access": (
             "The indexed 122-GB public BAM is queried by genomic interval with "
