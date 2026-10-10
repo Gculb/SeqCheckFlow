@@ -52,6 +52,26 @@ the default threshold is mean read quality 20. BAM/CRAM analysis uses samtools;
 CRAM decoding can use a matching reference FASTA. These checks and summaries do
 not trim, align, call, annotate, or interpret variants.
 
+### What a single-file report tells you
+
+The `analyze` command first checks file structure, then reports measurements for
+that file. The output is a JSON report plus a readable text summary; a valid
+file is not automatically a biologically correct or scientifically interpreted
+result.
+
+| File | Checks and measurements | How to read it / limits |
+| --- | --- | --- |
+| FASTA (`.fa`, `.fasta`, `.fna`) | Checks record/header structure and sequence characters; reports record count, total bases, minimum/maximum/mean sequence length, and GC percentage. | Useful for checking sequence inventory and basic composition. GC is calculated across all sequence characters in the denominator; it does not identify the organism or verify an assembly. |
+| FASTQ (`.fq`, `.fastq`) | Checks four-line records, sequence/quality length agreement, and characters; reports read count, length and base-quality distributions, mean quality, GC, ambiguous bases, and count/percentage below the selected mean-read-quality threshold. | Quality characters are interpreted as Phred+33. The default cutoff is mean read quality 20 per read. This command summarizes one file; it does not trim reads, test whether two mate files pair correctly, or prove coverage. |
+| VCF / VCF.GZ | Checks required header and record structure, positive positions, allele fields, QUAL parsing, and genotype indices; reports record/contig counts, SNP/indel/other allele counts, filter categories, sample/genotype counts, and mean QUAL. | These are syntax and summary checks. The command does not compare REF alleles against a reference, evaluate against truth, annotate functional consequences, or classify pathogenicity. |
+| BAM | Runs `samtools quickcheck`, `flagstat`, `stats`, and `coverage`; reports alignment, read/pair, mapping, and coverage summaries. | Integrity and mapping summaries do not call variants or establish that reads belong to the claimed sample. Review reference, mapping quality, and coverage for the region relevant to your question. |
+| CRAM | Runs the same summaries; if `--reference` is supplied, decodes through a temporary BAM using that FASTA first. | CRAM decoding depends on the matching reference assembly and contigs. A successful decode does not establish biological identity or variant accuracy. |
+
+For example, `low_quality_reads` counts reads whose **mean per-base** quality is
+below the configured threshold; it is not the count of individual low-quality
+bases. For CRAM, FASTQ, and VCF, keep the reference/build, quality encoding,
+and sample metadata with the report so the values can be interpreted later.
+
 ### Download examples
 
 ```bash
@@ -85,6 +105,14 @@ The separate `seqcheckflow.cli` entry point prints a basic FASTA/FASTQ summary.
 The documented `analyze` command is the report-producing interface and supports
 all five formats above.
 
+### Other project utilities: what their results mean
+
+| Utility | Result | Interpretation limit |
+| --- | --- | --- |
+| NCBI search and download | Sequence records or downloaded FASTQ/VCF/BAM/CRAM files. SRA runs are converted to FASTQ; direct URLs are copied as files. | Retrieval is not analysis. Confirm accession, organism, sample, assembly, and file checksums before using a downloaded file. |
+| Remote NCBI BLAST helper | One best-HSP summary per hit: accession/description, percent identity, query coverage, E-value, and bit score. | These values describe sequence similarity against the selected remote database. They do not prove gene function, orthology, pathogenicity, or that the best hit is biologically correct. |
+| BWA/minimap2 alignment helpers | SAM alignment output and SAM-to-BAM conversion. | Alignment is a mapping step, not a variant call or accuracy result. Review mapping and coverage with an alignment QC workflow and a matching reference. |
+
 ## Reproduce the analysis examples
 
 ### RNA-seq workflow
@@ -109,6 +137,38 @@ DESeq2 result tables/plots, and a session-information file under the output
 directory. A preview or synthetic R smoke test checks workflow/software wiring,
 not the full biological analysis. Full workflow runs are manual in GitHub
 Actions.
+
+### RNA-seq workflow: stages, outputs, and interpretation
+
+The sample sheet has eight paired libraries: four airway smooth-muscle donor
+cell lines, each with untreated (`untrt`) and dexamethasone-treated (`trt`)
+reads. The workflow uses the same donor label for each treatment pair.
+
+| Stage | What it does | Main output and check |
+| --- | --- | --- |
+| Download | Resolves each ENA run accession to paired FASTQ URLs, downloads both mates, and checks gzip integrity. | Keep the run accession-to-sample mapping from `analysis/airway_samples.tsv`; confirm each run yields both mates. |
+| fastp | Trims adapters and low-quality sequence from paired reads and generates per-sample QC. | Trimmed FASTQs plus fastp HTML/JSON under `qc/`; inspect retained read counts, quality, and adapter/quality trimming. |
+| Salmon reference setup | Downloads Ensembl 112 GRCh38 cDNA transcripts and matching GTF, builds the transcript index, and creates a transcript-to-gene map. | Index and `tx2gene.tsv`; the transcript FASTA and annotation must be from the same release/build. |
+| Salmon quantification | Uses selective alignment with mapping validation plus sequence- and GC-bias correction to estimate transcript abundance for each library. | `quant/*.quant.sf` and auxiliary metadata; inspect mapping rates and library summaries. Quantification is not a genome variant call or gene-level significance test. |
+| MultiQC | Combines fastp JSON and Salmon auxiliary summaries across samples. | `multiqc/multiqc_report.html` and general statistics; this is a workflow/read/quantification QC report, not evidence of a treatment effect. |
+| tximport and DESeq2 | Aggregates transcript estimates to genes with the matching transcript map, removes genes with total counts below 10, and fits `~ cell + dex`; `untrt` is the reference level. | `results/deseq2_results.csv`, summary, and `session_info.txt`; each gene has effect estimate, uncertainty/statistic, raw p-value, and BH-adjusted p-value. |
+| Plots | Produces a PCA, MA plot, and volcano plot from the DESeq2 fit. | Interpret the PCA as exploratory sample structure; use MA for effect versus abundance; use the volcano plot for effect size versus adjusted evidence. None replaces the model or multiple-testing threshold. |
+
+For this run, the PCA’s first two components account for 52% and 37% of the
+variance. Mapping rates were 92.3–93.9%. No genes met BH-adjusted `p < 0.05` for
+the dexamethasone coefficient. This means the analysis did not detect
+significant genes with four donors under this model; it does not show that the
+treatment has no biological effect. Large estimated fold changes without small
+adjusted p-values are uncertain estimates, not significant discoveries.
+
+Before interpreting another RNA-seq result, establish that sample IDs,
+accessions, donor pairing, and treatment labels agree; read QC and quantification
+are acceptable; the transcript reference and gene annotation match; the model
+represents the experimental design; and the biological replicate count supports
+the intended inference. Keep the samplesheet, reference release, exact
+parameters, pipeline/container versions, MultiQC, DESeq2 table, and R session
+information together. The [analysis report](../PIPELINE_ANALYSIS.md) explains
+why each plot was selected and what its observed pattern means.
 
 ### HG002 regional benchmark
 

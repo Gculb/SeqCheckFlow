@@ -244,6 +244,25 @@ this model and sample size, not proof of no effect. The analysis has only four
 biological donors, and the observed sample structure shows that the treatment
 contrast is not a simple dominant axis shared identically across donors.
 
+### What each RNA-seq stage establishes
+
+| Stage | Purpose | Output / evidence to check |
+| --- | --- | --- |
+| ENA download | Fetch paired FASTQs for the eight run accessions in the sample sheet and verify gzip integrity. | Sample/run mapping and both read mates; a correct download does not validate sample labels or biological design. |
+| fastp | Trim adapters and low-quality sequence and produce per-library QC summaries. | Trimmed FASTQs and HTML/JSON reports; check read retention, quality, and adapter content before quantification. |
+| Salmon index | Build a transcript index from Ensembl 112 GRCh38 cDNA and derive transcript-to-gene mapping from the matching GTF. | Index plus `tx2gene.tsv`; keep the transcript reference and annotation release paired. |
+| Salmon quantification | Selectively align reads to transcripts, validate mappings, and estimate abundance with sequence/GC bias correction. | `quant.sf` plus mapping/quantification metadata; mapping rate is a quantification QC measure, not differential-expression evidence. |
+| MultiQC | Combine fastp and Salmon auxiliary summaries across samples. | A single HTML overview for sample-level QC; it does not test the treatment effect. |
+| tximport / DESeq2 | Import transcript estimates at gene level, filter genes with total counts below 10, then fit `~ cell + dex` and estimate treated versus untreated while accounting for donor cell line. | Gene table with `baseMean`, `log2FoldChange`, standard error/statistic, raw `pvalue`, and BH-adjusted `padj`; summary and R session information. |
+
+The samplesheet pairs each donor cell line across untreated and treated
+conditions. With only four biological donors, estimates have limited precision.
+The BH-adjusted threshold controls multiple testing at the analysis level; a
+large fold-change estimate alone is not enough evidence when its adjusted
+p-value is not significant. The PCA, MA, and volcano plots below each answer a
+different descriptive question and complement the model rather than replace it.
+
+
 ### Sample structure: PCA
 
 ![PCA of variance-stabilized gene expression; points are samples, color is treatment, and shape identifies donor cell line](docs/images/airway-pca.png)
@@ -287,11 +306,29 @@ fastp read-quality and Salmon mapping/quantification summaries into one place.
 It is included as a workflow-quality check, not as evidence for differential
 expression.
 
+## Single-file QC: measures and limits
+
+The CLI validates and summarizes individual files; it does not run the larger
+workflows above automatically. The JSON and text reports answer structural and
+basic QC questions, not biological interpretation.
+
+| Input | What the report measures | What it does not establish |
+| --- | --- | --- |
+| FASTA | Record count, total bases, min/max/mean sequence length, and GC content. | Species identity, assembly correctness, contamination, or sequence function. |
+| FASTQ | Read count, length/base-quality distributions, mean quality, GC, ambiguous bases, and reads below the mean Phred+33 cutoff. | Adapter removal, mate pairing across two files, mapping, or locus-level coverage. |
+| VCF / VCF.GZ | Record and contig counts, SNP/indel/other allele counts, filter categories, QUAL mean, sample names, and genotype counts. | Reference compatibility, truth-set accuracy, functional effect, or clinical significance. |
+| BAM / CRAM | Samtools integrity check, flagstat, stats, and coverage summaries; CRAM can be decoded with a supplied reference. | Variant calls, claimed sample identity, or accuracy without suitable truth evaluation. |
+
+A structurally valid input may still be unsuitable for a particular biological
+question. Keep the assembly, sample metadata, and a matching reference for CRAM
+with its reports.
+
 ## Limits and next steps
 
-The HG002 run is a single-sample, single-region, two-thread parity check. Its
-confident bases cover only 1.84% of the requested interval, so its truth metrics
-are too narrow to generalize. The RNA-seq result is an exploratory reanalysis
+The HG002 examples are single-sample, two-thread regional parity checks. The
+10–11 Mb chr21 interval has only 1.84% confident coverage and is too narrow to
+generalize; the 20–21 Mb run is strong evidence for that interval, not a
+chromosome-wide estimate. The RNA-seq result is an exploratory reanalysis
 of one public study with four donors; no adjusted-significant genes does not
 prove no treatment effect. Neither analysis supports clinical use or broad
 biological claims.
