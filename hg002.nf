@@ -4,9 +4,10 @@ params.interval = "chr20:10000000-11000000"
 params.threads = 2
 params.outdir = "results/HG002_nextflow"
 params.prepared_dir = null
+params.container_image = "seqcheckflow:latest"
 
 process PREPARE_GIAB {
-    container "seqcheckflow:latest"
+    container params.container_image
     cache false
 
     input:
@@ -26,7 +27,7 @@ process PREPARE_GIAB {
 }
 
 process FASTQ_QC {
-    container "seqcheckflow:latest"
+    container params.container_image
     publishDir "${params.outdir}/qc", mode: "copy"
 
     input:
@@ -44,7 +45,7 @@ process FASTQ_QC {
 }
 
 process SETUP_REFERENCE {
-    container "seqcheckflow:latest"
+    container params.container_image
     cpus params.threads
 
     input:
@@ -71,7 +72,7 @@ process SETUP_REFERENCE {
 }
 
 process BWA_ALIGN {
-    container "seqcheckflow:latest"
+    container params.container_image
     cpus params.threads
 
     input:
@@ -93,7 +94,7 @@ process BWA_ALIGN {
 }
 
 process SAM_TO_BAM {
-    container "seqcheckflow:latest"
+    container params.container_image
 
     input:
     path alignment_sam
@@ -108,7 +109,7 @@ process SAM_TO_BAM {
 }
 
 process NAME_SORT {
-    container "seqcheckflow:latest"
+    container params.container_image
     cpus params.threads
 
     input:
@@ -125,7 +126,7 @@ process NAME_SORT {
 }
 
 process FIXMATE {
-    container "seqcheckflow:latest"
+    container params.container_image
     cpus params.threads
 
     input:
@@ -142,7 +143,7 @@ process FIXMATE {
 }
 
 process COORDINATE_SORT {
-    container "seqcheckflow:latest"
+    container params.container_image
     cpus params.threads
 
     input:
@@ -159,7 +160,7 @@ process COORDINATE_SORT {
 }
 
 process MARK_DUPLICATES {
-    container "seqcheckflow:latest"
+    container params.container_image
     cpus params.threads
 
     input:
@@ -181,7 +182,7 @@ process MARK_DUPLICATES {
 }
 
 process BASE_RECALIBRATOR {
-    container "seqcheckflow:latest"
+    container params.container_image
     cpus params.threads
 
     input:
@@ -203,7 +204,7 @@ process BASE_RECALIBRATOR {
 }
 
 process APPLY_BQSR {
-    container "seqcheckflow:latest"
+    container params.container_image
     cpus params.threads
 
     input:
@@ -230,7 +231,7 @@ process APPLY_BQSR {
 }
 
 process HAPLOTYPE_CALLER {
-    container "seqcheckflow:latest"
+    container params.container_image
     cpus params.threads
     publishDir "${params.outdir}/variants", mode: "copy"
 
@@ -253,7 +254,7 @@ process HAPLOTYPE_CALLER {
 }
 
 process VCF_QC {
-    container "seqcheckflow:latest"
+    container params.container_image
     publishDir "${params.outdir}/qc", mode: "copy"
 
     input:
@@ -269,7 +270,7 @@ process VCF_QC {
 }
 
 process SCORE_VARIANTS {
-    container "seqcheckflow:latest"
+    container params.container_image
     publishDir "${params.outdir}/truth_evaluation", mode: "copy"
 
     input:

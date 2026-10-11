@@ -129,6 +129,101 @@ assessment of callability, but does not alone establish that a variant call is
 correct. The benchmark reports mean depth and the fraction of requested-region
 bases with at least one aligned base.
 
+## Workflow tools and techniques
+
+These tools belong to different analysis paths. They are not all chained
+together, and BLAST is not part of either the RNA-seq or HG002 benchmark run.
+
+### Why the RNA-seq workflow uses a different design
+
+The RNA-seq example starts with eight paired-end airway smooth-muscle libraries
+from GEO GSE52778. Its goal is to estimate gene expression and compare
+dexamethasone-treated with untreated samples while accounting for donor cell
+line. Its stages are:
+
+1. **ENA and `curl`** retrieve paired FASTQ files for the run accessions in
+   `analysis/airway_samples.tsv`. Data acquisition is an explicit workflow
+   task; it still depends on the remote archive and network access.
+2. **fastp** trims and filters reads and writes per-sample HTML and JSON QC
+   reports. This is a preprocessing step in `main.nf`; the separate single-file
+   CLI only reports FASTQ quality and does not trim reads.
+3. **Salmon** builds a transcript index from Ensembl release 112 and quantifies
+   each library with mapping validation and sequence- and GC-bias correction.
+   It estimates transcript abundance without creating the coordinate-sorted
+   BAM required by the variant-calling workflow.
+4. **tximport** imports Salmon estimates and summarizes transcript-level
+   abundance for gene-level analysis using the generated transcript-to-gene
+   map.
+5. **DESeq2** fits `~ cell + dex`, using donor cell line (`cell`) as a blocking
+   factor and testing treated versus untreated (`dex`). It applies a low-count
+   filter and reports Benjamini-Hochberg adjusted p-values. With four donors,
+   no significant genes is not proof of no treatment effect.
+6. **MultiQC** combines fastp reports and Salmon summary metadata into a
+   project-level QC report.
+
+Nextflow allows independent per-sample download, trimming, and quantification
+tasks to run separately, then gathers all quantifications for one combined
+DESeq2 analysis. This fan-out/fan-in pattern fits the data: sample processing
+is independent, but the statistical model needs samples together. The custom
+RNA-seq image contains R, fastp, Salmon, tximport, and DESeq2; MultiQC runs in
+its own pinned image. This is a modern reanalysis of public reads, not a
+recreation of the original study's legacy computational or experimental
+methods.
+
+### Why the HG002 workflow uses a different design
+
+The HG002 example asks where sample reads support variants relative to a
+reference, and how those calls compare with a benchmark truth set. Its stages
+form a dependency chain because each needs the preceding output:
+
+1. **GIAB data preparation** extracts a requested GRCh38 autosomal interval
+   and prepares paired FASTQ, reference, known-sites, truth, confident-region,
+   and RTG reference resources. Preparation accepts chr1–chr22, but retained
+   end-to-end evidence covers chr20 and two chr21 intervals only.
+2. **BWA-MEM** aligns reads to the selected reference and records read-group
+   metadata. Alignment estimates where reads fit; it does not decide the final
+   genotype at a site.
+3. **samtools** converts and sorts alignments. Name sorting groups mates for
+   `fixmate`; coordinate sorting enables duplicate marking and indexed
+   reference-coordinate access. `markdup` flags duplicate reads, and coverage
+   is summarized for the requested interval.
+4. **GATK BaseRecalibrator and ApplyBQSR** use the separate known-sites VCF to
+   estimate and adjust systematic base-quality errors. This resource is not
+   the truth set used to judge calls.
+5. **GATK HaplotypeCaller** examines recalibrated alignments and emits
+   candidate variants in VCF format.
+6. **RTG `vcfeval`** compares calls with the GIAB truth VCF, restricted to the
+   confident-region BED and using the matching RTG reference SDF. Calls
+   outside confident regions are unscored, not automatically false positives.
+
+The HG002 Nextflow DAG makes sequential dependencies explicit and lets
+Nextflow track task inputs, outputs, and execution. Its container packages the
+Python project and command-line benchmark tools. The separate generic
+benchmark also runs direct tool commands and SeqCheckFlow wrappers against the
+same inputs; matching call records support wrapper parity for that tested run,
+not general accuracy or superiority. RNA-seq does not need this
+alignment/BAM/recalibration/calling chain because its endpoint is expression
+quantification rather than genomic variant calls.
+
+### Other execution and comparison technologies
+
+- **Docker** supplies workflow-specific software environments. Images reduce
+  dependence on host-installed bioinformatics tools, but reproducibility still
+  depends on image versions/digests, source data, references, parameters, host
+  resources, and external network services. The RNA-seq and HG002 images serve
+  different tool stacks.
+- **Nextflow DSL2** expresses processes, inputs, outputs, and dependencies. A
+  `docker` profile runs tasks in containers locally. The optional `awsbatch`
+  profile submits tasks to a user-provided AWS Batch queue and stages work and
+  published outputs through S3. It does not create AWS infrastructure and has
+  not been verified by a live AWS run in this project.
+- **RTG `vcfeval`** evaluates calls against a baseline truth set using
+  variant-aware matching. It is an evaluation tool, not a caller. Precision,
+  recall, and F1 describe only the variants and regions scored.
+- **BLAST** is an optional standalone helper that submits queries to NCBI's
+  remote service. It is not a stage in either Nextflow analysis, and similarity
+  results are not proof of biological function.
+
 ## Software questions
 
 **What should happen when an input file is malformed?**

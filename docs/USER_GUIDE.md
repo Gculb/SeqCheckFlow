@@ -99,7 +99,7 @@ automatically feed the files to the analysis command.
 | BLAST | Optional remote NCBI BLAST search, exposed as a Python helper; not a standalone CLI command. | `seqcheckflow.blast` |
 | Alignment | Optional BWA/minimap2 alignment and SAM-to-BAM helper functions; not automatically part of single-file analysis. | `seqcheckflow.alignment` |
 | RNA-seq | Eight-sample ENA → fastp → Salmon → MultiQC and tximport/DESeq2 example. | `main.nf`, `analysis/` |
-| HG002 | Regional GIAB preparation for GRCh38 autosomes chr1–chr22; wrapper-versus-direct-tool comparison; separate stage-by-stage Nextflow DAG. | `seqcheckflow.giab_data`, `seqcheckflow.full_benchmark`, `hg002.nf` |
+| HG002 | Preparation code accepts GRCh38 autosomes chr1–chr22; wrapper-versus-direct-tool comparison; separate stage-by-stage Nextflow DAG. End-to-end results in this checkout cover chr20 and two chr21 intervals only. | `seqcheckflow.giab_data`, `seqcheckflow.full_benchmark`, `hg002.nf` |
 
 The separate `seqcheckflow.cli` entry point prints a basic FASTA/FASTQ summary.
 The documented `analyze` command is the report-producing interface and supports
@@ -138,6 +138,111 @@ directory. A preview or synthetic R smoke test checks workflow/software wiring,
 not the full biological analysis. Full workflow runs are manual in GitHub
 Actions.
 
+This command reproduces **SeqCheckFlow's reanalysis**, not the original paper's
+exact computational pipeline. The paper used Taffeta, TopHat 2.0.4, Cufflinks
+and Cuffdiff 2.0.2, hg19 RefSeq plus ERCC references, and related legacy QC
+tools; this project uses fastp, Salmon, tximport, DESeq2, and Ensembl 112
+GRCh38. The [analysis report](../PIPELINE_ANALYSIS.md#primary-sources-and-what-this-project-can-conclude)
+lists the original tool versions and what would be needed for a closer
+computational recreation. The paper also includes wet-lab and genetic analyses
+that this workflow does not reproduce.
+
+### AWS Batch execution (optional)
+
+Both Nextflow workflows have an `awsbatch` profile. This profile sends tasks to
+an existing AWS Batch job queue, uses S3 for the Nextflow work directory, and
+publishes deliverables to the S3 `--outdir`. It does not create the AWS
+infrastructure. Follow the [Nextflow AWS Batch setup
+guide](https://www.nextflow.io/docs/24.10/aws.html#aws-batch) and the [AWS Batch
+getting started guide](https://docs.aws.amazon.com/batch/latest/userguide/getting-started.html)
+to provide a queue/compute environment, an S3 bucket, IAM permissions, and
+network access for image pulls and public data downloads. Keep the bucket and
+compute environment in the same AWS region. The profile defaults to `us-east-1`;
+override it with `--aws_region` for another region. Use an EC2-backed Batch compute
+environment for these Docker container workflows.
+
+The launch machine needs Java 17, Nextflow 24.10.5, AWS credentials for the
+driver, and Docker to build/push images. Install the compatible AWS plugin with
+the versioned `-plugins nf-amazon@2.9.2` launch option. Build the workflow
+images for the Linux architecture used by the Batch compute environment, push
+them to ECR, and pass the full ECR image URI. Do not put AWS keys in this
+repository. The Batch job role and instance roles must grant the required S3,
+ECR, CloudWatch Logs, and Batch access; use least-privilege policies. The
+HG002 preparation stage also needs outbound access to the public GIAB, UCSC,
+and Broad sources. Nextflow uses the AWS CLI to stage S3 files: the Batch
+compute environment AMI must provide it at `/home/ec2-user/miniconda/bin/aws`
+(the profile's default), or pass its actual host path using `--aws_cli_path`.
+Use a custom ECS-optimized AMI if needed to install the AWS CLI at that path;
+see [Nextflow's AWS CLI/AMI notes](https://docs.seqera.io/nextflow/aws#custom-ami).
+Choose an EC2 instance/storage configuration with enough memory and task-local
+disk for reference indexes and intermediate BAM/FASTQ files; the small default
+Batch instance disk may be insufficient for genomic workflows.
+
+For example, after creating ECR repositories and configuring AWS credentials,
+build and push versioned images from the repository root (replace the account,
+region, and tag):
+
+```bash
+export AWS_REGION=us-east-1
+export ECR_REGISTRY=123456789012.dkr.ecr.${AWS_REGION}.amazonaws.com
+aws ecr get-login-password --region "$AWS_REGION" \
+  | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+docker build --platform linux/amd64 -f containers/rnaseq.Dockerfile \
+  -t "$ECR_REGISTRY/seqcheckflow-rnaseq:project-v1" .
+docker push "$ECR_REGISTRY/seqcheckflow-rnaseq:project-v1"
+docker build --platform linux/amd64 -f containers/Dockerfile \
+  -t "$ECR_REGISTRY/seqcheckflow:project-v1" .
+docker push "$ECR_REGISTRY/seqcheckflow:project-v1"
+```
+
+Mirror the pinned MultiQC image to an ECR repository as well if Batch workers
+cannot pull from Docker Hub. Use the resulting ECR URI for
+`--multiqc_container_image`.
+
+Example RNA-seq launch (replace the bucket, queue, region, account ID, and
+versioned ECR image URIs with resources already configured for your AWS
+account):
+
+```bash
+nextflow run main.nf \
+  -plugins nf-amazon@2.9.2 \
+  -profile awsbatch \
+  -work-dir s3://YOUR_BUCKET/seqcheckflow-work/rnaseq \
+  --aws_queue YOUR_BATCH_QUEUE \
+  --aws_region us-east-1 \
+  --aws_cli_path /home/ec2-user/miniconda/bin/aws \
+  --container_image 123456789012.dkr.ecr.us-east-1.amazonaws.com/seqcheckflow-rnaseq:VERSION \
+  --multiqc_container_image 123456789012.dkr.ecr.us-east-1.amazonaws.com/seqcheckflow-multiqc:VERSION \
+  --samplesheet analysis/airway_samples.tsv \
+  --threads 2 --max_forks 1 \
+  --outdir s3://YOUR_BUCKET/seqcheckflow-results/rnaseq
+```
+
+Example HG002 Nextflow launch (omit `--prepared_dir` to prepare the selected
+interval in the workflow, or supply a directory that the launch host can
+stage):
+
+```bash
+nextflow run hg002.nf \
+  -plugins nf-amazon@2.9.2 \
+  -profile awsbatch \
+  -work-dir s3://YOUR_BUCKET/seqcheckflow-work/hg002 \
+  --aws_queue YOUR_BATCH_QUEUE \
+  --aws_region us-east-1 \
+  --aws_cli_path /home/ec2-user/miniconda/bin/aws \
+  --container_image 123456789012.dkr.ecr.us-east-1.amazonaws.com/seqcheckflow:VERSION \
+  --interval chr21:20000000-21000000 --threads 2 \
+  --outdir s3://YOUR_BUCKET/seqcheckflow-results/hg002
+```
+
+The S3 work prefix stores task intermediates and can become large; the result
+prefix contains published outputs. Set an S3 lifecycle policy appropriate for
+your retention needs after confirming which outputs you want to keep. AWS
+Batch, EC2 compute, ECR, S3 requests/storage, and data transfer may incur
+charges. No cloud run is performed by this documentation or CI. The AWS
+profile is configuration support only until exercised in an account with the
+required infrastructure and permissions.
+
 ### RNA-seq workflow: stages, outputs, and interpretation
 
 The sample sheet has eight paired libraries: four airway smooth-muscle donor
@@ -173,8 +278,11 @@ why each plot was selected and what its observed pattern means.
 ### HG002 regional benchmark
 
 The short Docker Compose launcher commands prepare inputs and compare both
-workflows. The automatic HG002 downloader supports GRCh38 autosomes chr1–chr22;
-preparation refuses to overwrite an existing directory, as does comparison.
+workflows. The HG002 preparation code accepts GRCh38 autosomes chr1–chr22;
+however, only chr20 and chr21 intervals have end-to-end benchmark evidence in
+this checkout. Acceptance by the downloader does not mean every chromosome has
+been validated. Preparation refuses to overwrite an existing directory, as
+does comparison.
 For a 1 Mb chr21 run in PowerShell:
 
 ```powershell
@@ -241,8 +349,10 @@ error review follows [GA4GH benchmarking best practices](https://pmc.ncbi.nlm.ni
 
 ### Other organisms and user-supplied regions
 
-The generic `benchmark` command is not tied to HG002 or human chromosome
-names. Supply paired FASTQs, a reference FASTA, a matching known-sites VCF, an
+The generic `benchmark` command is not hard-coded to HG002 or human chromosome
+names; it is designed to accept supplied compatible resources. This code path
+has not been demonstrated on another species in the retained project results.
+Supply paired FASTQs, a reference FASTA, a matching known-sites VCF, an
 RTG reference SDF made from that FASTA, a truth VCF, and a confident-regions
 BED. The reference, VCFs, BED, reads, and `--interval` must use compatible
 assemblies and matching contig names. For example, the same code can benchmark

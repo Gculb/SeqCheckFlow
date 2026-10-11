@@ -21,3 +21,6 @@ results/*
 # Keep directory structure in git
 !data/processed/.gitkeep
 !results/.gitkeep
+
+
+.test_tmp

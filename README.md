@@ -14,6 +14,9 @@ analyze every file type, or claim new biological findings.
 
 ## What it does today
 
+**[Open the project dashboard](./docs/dashboard.html)** for a visual overview
+of the retained HG002 benchmark regions and the airway RNA-seq analysis.
+
 | Entry point | Current scope |
 | --- | --- |
 | `seqcheckflow.pipeline` | Processes one local FASTA, FASTQ, VCF/VCF.GZ, BAM, or CRAM file and writes JSON/text validation and summary reports. |
@@ -70,6 +73,10 @@ study—not a new biological discovery. See
 [chr21 results by region](./docs/images/hg002-chr21-region-accuracy.svg),
 [RNA-seq QC](./docs/reports/airway-multiqc.html), and the
 [analysis report](./PIPELINE_ANALYSIS.md) for plots, methods, and caveats.
+The report also links the primary RNA-seq publication and GIAB benchmark
+reference, and explains which published findings our current results do—and do
+not—reproduce. The RNA-seq workflow reruns our modern reanalysis; the original
+paper's legacy computational environment and wet-lab analyses are not included.
 
 ### RNA-seq plots
 
@@ -117,17 +124,20 @@ outputs, optional tools, and workflow prerequisites are documented in
 
 ## Run the example workflows
 
-The HG002 data-preparation command can target any GRCh38 autosome from chr1 to
-chr22, including chr21. The generic `benchmark` command can use another
-organism when you provide compatible reads, reference, known-sites, truth, and
-confident-region files. See [the user guide](./docs/USER_GUIDE.md) for a chr21
-example and a custom-species command.
+The HG002 data-preparation code accepts GRCh38 autosomes chr1–chr22. In this
+checkout, end-to-end benchmark results are documented only for chr20 and two
+chr21 intervals; the other autosomes are supported inputs, not validated runs.
+The generic `benchmark` command is designed for supplied compatible resources
+from another organism, but cross-species operation has not been demonstrated
+here. See [the user guide](./docs/USER_GUIDE.md) for the tested intervals, a
+chr21 example, and the custom-resource command pattern.
 
 The Nextflow examples are optional, resource-intensive runs and require Java
 17, Nextflow 24.10.5, Docker, and a Linux environment (WSL2 is suitable on
 Windows). The Docker Compose launcher also supports the direct HG002 comparison
 in PowerShell as shown below. See
 [the workflow and scaling notes](./ARCHITECTURE.md) before running larger data.
+An optional AWS Batch profile is documented in the [user guide](./docs/USER_GUIDE.md#aws-batch-execution-optional).
 
 Raw-read RNA-seq:
 

@@ -15,6 +15,50 @@ directory is not available in this checkout.
 The RNA-seq figures are from the eight-library run described below. Result
 directories are local generated artifacts and are ignored by Git.
 
+## Primary sources and what this project can conclude
+
+These analyses have different aims. The HG002 workflow is a methods benchmark,
+not a biological hypothesis test. The airway workflow is a reanalysis of an
+existing experiment; it asks whether this implementation recovers evidence in
+the same direction as the published analysis, not whether the experiment should
+be treated as a new survey.
+
+| Analysis | Primary source and published claim | What our result says |
+| --- | --- | --- |
+| Airway RNA-seq | [Himes et al. 2014, PLOS ONE](https://doi.org/10.1371/journal.pone.0099625) analyzed the [GSE52778 GEO dataset](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE52778). Their four-donor dexamethasone experiment reported 316 genes with BH-adjusted *p* < 0.05 and followed up CRISPLD2 as a glucocorticoid-responsive gene. | Our eight-library reanalysis of those same four donor pairs reports zero genes at BH-adjusted *p* < 0.05 under Salmon/tximport/DESeq2 (`~ cell + dex`). Thus this run does **not reproduce the paper's transcriptome-wide significant-gene result**. It does not establish that the paper's biological hypothesis is false: this is a reanalysis with a different quantification/reference/statistical workflow, and failure to reach significance is not evidence of no effect. The generated gene-level table is not retained in this checkout, so this report cannot verify whether CRISPLD2's estimated direction agrees with the paper. |
+| HG002 variant benchmark | [Zook et al. 2019, Nature Biotechnology](https://doi.org/10.1038/s41587-019-0074-6) describes GIAB benchmark callsets for measuring small-variant pipeline accuracy; [NIST's benchmark FAQ](https://www.nist.gov/programs-projects/faqs-genome-bottle) explains their intended evaluation use and limits. | There is no biological hypothesis to accept or reject. Our operational check is whether wrappers reproduce direct tool calls and how both callsets score against GIAB truth in confident bases. Exact records match in the retained chr21 comparisons; accuracy is interval-specific and applies only to evaluated bases. The results support parity for these runs, not broad workflow validation. |
+| Single-file QC and summaries | These commands validate file structure and report format-specific measurements; they are software checks, not a reanalysis of a primary biological study. | They can report whether supported input structure checks passed and summarize properties such as read quality or alignment coverage. They do not test biological hypotheses or establish sample identity, variant truth, or clinical significance. |
+
+Accordingly, the RNA-seq result is **not a successful reproduction of the
+published differential-expression finding yet**. To make that comparison
+auditable, retain the gene-level results and compare the published 316-gene
+set and CRISPLD2 estimate (log2 fold change, adjusted *p*, and direction) under
+matched sample selection. Differences in reference annotation, quantification,
+model formula, and filtering should be recorded; they may explain disagreement
+but should not be assumed to do so without checking.
+
+### Do we have enough tools to reproduce the published RNA-seq analysis?
+
+It depends on what “reproduce” means:
+
+| Goal | Current status | What is available or missing |
+| --- | --- | --- |
+| Rerun this project's reanalysis | **Yes, with caveats.** | The workflow downloads the eight paired FASTQ libraries from ENA and runs fastp, Salmon, tximport, DESeq2, and MultiQC in Docker/Nextflow. It uses Ensembl 112 GRCh38 and the donor-adjusted `~ cell + dex` model. Network access and the current external sources are required. |
+| Recreate the paper's computational RNA-seq result | **Not with the current workflow.** | Himes et al. used the Taffeta processing scripts, FastQC 0.10.0, FASTX Toolkit 0.0.13 (trimming the first 12 bases), TopHat 2.0.4 against hg19 plus ERCC sequences, Cufflinks/Cuffdiff 2.0.2 with hg19 RefSeq annotation, and CummeRbund 0.1.3. Our fastp/Salmon/tximport/DESeq2 + Ensembl 112 GRCh38 workflow is a modern reanalysis, not a recreation of those computations. The original tools, exact hg19/ERCC reference bundle, and original Taffeta environment are not packaged in this repository. |
+| Recreate every experiment and conclusion in the paper | **No.** | The paper also reports qRT-PCR, Western blot, knockdown, cytokine, and genetic-association analyses. This project contains only the raw-read RNA-seq reanalysis and does not reproduce those wet-lab experiments or GWAS analyses. |
+
+The current container is also not a strict archival lockfile: the R base and
+Bioconductor release are specified, but apt-installed fastp/Salmon and R package
+versions are not all pinned individually. For stronger reruns of this
+project's analysis, record the built container digest, exact tool/package
+versions, run accessions and FASTQ checksums, Ensembl files/checksums, workflow
+revision, and outputs. For a computational recreation of the paper, build and
+document a separate legacy environment for the versions and references listed
+above, then compare gene-level estimates with the paper's supplementary table.
+The paper's methods and the current workflow are linked through the [primary
+article](https://doi.org/10.1371/journal.pone.0099625) and [GEO series
+GSE52778](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE52778).
+
 ## Executive summary
 
 - In both chr21 intervals, the direct-tool and SeqCheckFlow callsets had

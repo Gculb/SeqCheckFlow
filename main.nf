@@ -5,9 +5,11 @@ params.samplesheet = "${projectDir}/analysis/airway_samples.tsv"
 params.threads = 2
 params.max_forks = 1
 params.ensembl_release = "112"
+params.container_image = "seqcheckflow-rnaseq:latest"
+params.multiqc_container_image = "multiqc/multiqc:v1.27@sha256:b4c30167e87ecb120925792c20c4c98d06076dde5f6ba9af48dda792fa549225"
 
 process DOWNLOAD_READS {
-    container "seqcheckflow-rnaseq:latest"
+    container params.container_image
     cpus 1
     maxForks params.max_forks
 
@@ -37,7 +39,7 @@ process DOWNLOAD_READS {
 }
 
 process FASTP {
-    container "seqcheckflow-rnaseq:latest"
+    container params.container_image
     cpus params.threads
     maxForks params.max_forks
     publishDir "${params.outdir}/qc", mode: "copy", pattern: "*fastp.*"
@@ -67,7 +69,7 @@ process FASTP {
 }
 
 process SALMON_INDEX {
-    container "seqcheckflow-rnaseq:latest"
+    container params.container_image
     cpus params.threads
 
     output:
@@ -100,7 +102,7 @@ process SALMON_INDEX {
 }
 
 process SALMON_QUANT {
-    container "seqcheckflow-rnaseq:latest"
+    container params.container_image
     cpus params.threads
     maxForks params.max_forks
     publishDir "${params.outdir}/quant", mode: "copy", pattern: "*.quant.sf"
@@ -139,7 +141,7 @@ process SALMON_QUANT {
 }
 
 process MULTIQC {
-    container "multiqc/multiqc:v1.27@sha256:b4c30167e87ecb120925792c20c4c98d06076dde5f6ba9af48dda792fa549225"
+    container params.multiqc_container_image
     publishDir "${params.outdir}/multiqc", mode: "copy"
 
     input:
@@ -168,7 +170,7 @@ process MULTIQC {
 }
 
 process DESEQ2 {
-    container "seqcheckflow-rnaseq:latest"
+    container params.container_image
     publishDir "${params.outdir}/results", mode: "copy"
 
     input:
