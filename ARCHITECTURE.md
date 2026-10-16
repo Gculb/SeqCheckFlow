@@ -134,17 +134,59 @@ cross-species benchmark is retained as evidence in this project.
 
 ### Raw-read airway RNA-seq analysis
 
+```mermaid
+flowchart LR
+    Sheet[Samplesheet: sample, donor, treatment, ENA run] --> Runs[Per-sample ENA run tasks]
+    Runs --> Meta[Resolve paired FASTQ URLs and expected sizes / MD5]
+    Meta --> Stream[Download each mate to task-local .part file]
+    Stream --> Resume[Retry and resume interrupted transfer with HTTP Range]
+    Resume --> Check{Byte count, ENA MD5, gzip checks pass?}
+    Check -->|No| Retry[Retry transfer; fail after limit]
+    Retry --> Stream
+    Check -->|Yes| Raw[Publish verified paired FASTQs and download manifest]
+
+    Raw --> Fastp[fastp per sample: trim and read QC]
+    Fastp --> Trimmed[Trimmed paired FASTQs]
+    Trimmed --> Quant[Salmon per-sample quantification]
+    Ensembl[Ensembl 112 cDNA + annotation] --> Index[Build Salmon index and tx2gene map]
+    Index --> Quant
+    Fastp --> QcInputs[fastp JSON]
+    Quant --> QcInputs2[Salmon auxiliary metadata]
+    QcInputs --> MultiQC[MultiQC report]
+    QcInputs2 --> MultiQC
+    QcInputs --> SampleQC[Per-sample QC summary]
+    QcInputs2 --> SampleQC
+    Quant --> Gather[Gather all quant.sf files]
+    Gather --> Import[tximport with tx2gene]
+    Index --> Import
+    Sheet --> Model[DESeq2 model: ~ cell + dex]
+    Import --> Model
+    Model --> Results[Gene results, normalized counts, variance diagnostics]
+    Model --> Plots[PCA, MA, and volcano plots]
+```
+
 `main.nf` obtains paired raw reads from ENA for the eight
 dexamethasone/untreated libraries listed in `analysis/airway_samples.tsv`.
-Separate processes download reads, run fastp, build a Salmon index from Ensembl
-112 GRCh38 cDNA, and quantify each library. The R analysis imports Salmon
-quantifications with a transcript-to-gene map and tximport, then fits
-`~ cell + dex` in DESeq2. It reports gene-level results and MA, volcano, and
-PCA plots. A MultiQC task combines fastp JSON and Salmon auxiliary summary
-metadata into an HTML report. This is a reanalysis of a public study
-(GSE52778), not a novel cohort or independent validation. The ordinary Actions
-job only previews the DAG; the full read download is manually dispatched and
-produces a downloadable artifact with the QC and analysis outputs.
+For each mate, the downloader writes to a task-local partial file, retries and
+resumes interrupted HTTP transfers, then checks the expected byte count, ENA
+MD5, and gzip integrity before publishing the FASTQ and a provenance manifest.
+This streams transfer data to disk so the whole compressed file is not held in
+memory; fastp starts after its sample's complete pair has passed validation,
+rather than consuming a live download stream. Transfer retries happen inside
+the download task, and failed tasks can be rerun with `-resume`; completed
+tasks can be reused with the same option. `download_forks` and `max_forks`
+control download and analysis concurrency separately.
+
+Separate processes run fastp, build a Salmon index from Ensembl 112 GRCh38
+cDNA, quantify each library, and collect per-sample and combined QC. The R
+analysis imports Salmon quantifications with a transcript-to-gene map and
+tximport, then fits `~ cell + dex` in DESeq2. It reports gene-level results,
+normalized counts, variance diagnostics, and MA, volcano, and PCA plots. A
+MultiQC task combines fastp JSON and Salmon auxiliary summary metadata into an
+HTML report. This is a reanalysis of a public study (GSE52778), not a novel
+cohort or independent validation. The ordinary Actions job only previews the
+DAG; the full read download is manually dispatched and produces a downloadable
+artifact with the QC and analysis outputs.
 
 Both Nextflow workflows also support an optional AWS Batch profile. The user
 provides the Batch queue/compute environment, S3 work and output prefixes, AWS
