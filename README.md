@@ -53,6 +53,42 @@ workflow diagrams, and [DESIGN_NOTES.md](./DESIGN_NOTES.md) for file formats,
 metric interpretation, and implementation decisions. The complete command and
 dependency reference is in [the user guide](./docs/USER_GUIDE.md).
 
+## Why these tools are used
+
+The tools are arranged to answer different questions at each stage. The
+RNA-seq workflow estimates gene-expression changes; the variant benchmark
+checks whether a calling workflow reproduces a direct baseline and how both
+callsets compare with a truth set. Results from one path do not substitute for
+the other.
+
+### RNA-seq analysis
+
+| Tool or resource | Why it is used here | What it contributes—and what it cannot establish |
+| --- | --- | --- |
+| Nextflow | Connects downloads, per-sample processing, quantification, and the combined analysis as explicit tasks. | Tracks task inputs and outputs, schedules independent samples, and supports resuming completed work. It does not validate the biological design by itself. |
+| ENA and `curl` | ENA supplies the public paired FASTQs; `curl` transfers them to task-local files with retry and resume support. | Expected byte counts, MD5 checksums, and gzip checks help detect incomplete or corrupted transfers. They do not prove that sample labels are biologically correct. |
+| fastp | Trims adapter/low-quality sequence and reports read quality before and after filtering. | Provides read-level QC and processed paired reads for quantification; QC does not show that a treatment effect is present. |
+| Ensembl 112 GRCh38 cDNA and annotation | Supplies the transcript reference for this run and the transcript-to-gene mapping. | Keeps quantification and gene aggregation tied to a declared reference release; results can differ with another annotation. |
+| Salmon | Estimates transcript abundance from each paired library using selective alignment, mapping validation, and sequence/GC-bias corrections. | Produces per-sample transcript estimates and mapping summaries; it does not perform the treatment-level significance test. |
+| tximport | Imports Salmon estimates and aggregates transcript-level abundance to gene-level counts for DESeq2. | Uses transcript-to-gene mapping and length-aware count import; it does not add biological replicates. |
+| DESeq2 | Models gene counts with a negative-binomial framework and estimates the dexamethasone effect while accounting for donor cell line (`~ cell + dex`). | Reports log2 fold changes, uncertainty, and multiple-testing-adjusted p-values. Four donor pairs limit precision and power. |
+| MultiQC and the sample QC summary | Combine fastp and Salmon metrics across libraries for review. | Help identify sample-level quality or mapping differences; they are QC summaries, not differential-expression evidence. |
+
+### Variant-calling benchmark
+
+| Tool or resource | Why it is used here | What it contributes—and what it cannot establish |
+| --- | --- | --- |
+| BWA-MEM | Maps paired reads to the selected reference genome. | Creates the alignments used by downstream processing and calling; mapping quality and local sequence context can affect calls. |
+| samtools | Converts, sorts, indexes, and summarizes alignments; `fixmate` prepares mate fields and duplicate marking identifies likely PCR/optical duplicates. | Produces coordinate-sorted alignments and alignment QC for GATK; summary metrics do not themselves validate variant calls. |
+| GATK BaseRecalibrator / ApplyBQSR | Models and applies base-quality recalibration using known variants as calibration sites. | Adjusts quality scores before calling; the known-sites file is not the benchmark truth set. |
+| GATK HaplotypeCaller | Calls small variants from the processed alignments over a specified interval. | Produces a VCF for comparison; a VCF alone does not give accuracy without a suitable truth set and confident-region mask. |
+| RTG `vcfeval` and GIAB truth resources | Compare each VCF with the GIAB truth callset inside the confident BED intervals. | Report scored true/false positives and false negatives and derived precision/recall/F1 for those bases only. Calls outside the confident regions are unscored. |
+| Direct-tool baseline and SeqCheckFlow wrappers | Run the same configured tools and inputs through two execution paths. | Exact record parity checks wrapper behavior; it is separate from truth-set accuracy and does not prove broad or clinical validity. |
+
+Docker packages the external runtime dependencies for these workflows, while
+Nextflow manages their task graph. Together they make runs easier to repeat;
+they do not replace recording exact versions, inputs, checksums, and parameters.
+
 ## Example results and limits
 
 The examples show what the current project has exercised; they do not establish
