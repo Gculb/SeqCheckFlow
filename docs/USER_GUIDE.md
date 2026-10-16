@@ -129,10 +129,14 @@ nextflow run main.nf -profile docker \
 ```
 
 This downloads the eight public libraries and the Ensembl 112 GRCh38 cDNA
-reference, so it requires internet access and substantial disk space. Threads
-per fastp/Salmon task are controlled by `--threads`; maximum concurrent
-download, trimming, and quantification tasks are controlled by `--max_forks`
-(default 1). Outputs include trimmed-read QC, Salmon quantification, MultiQC,
+reference, so it requires internet access and substantial disk space. FASTQ
+downloads stream to task-local partial files, resume after interrupted transfers,
+retry transient failures, and verify ENA byte counts, MD5 checksums, and gzip
+integrity before publishing each mate. Per-sample `*.download.tsv` manifests
+record the source URLs, sizes, and checksums. Threads per fastp/Salmon task are
+controlled by `--threads`; downloads run up to four at a time by default and
+can be tuned with `--download_forks`. Concurrent fastp and Salmon tasks are
+controlled by `--max_forks` (default 1). Outputs include trimmed-read QC, Salmon quantification, MultiQC,
 DESeq2 result tables/plots, and a session-information file under the output
 directory. A preview or synthetic R smoke test checks workflow/software wiring,
 not the full biological analysis. Full workflow runs are manual in GitHub
@@ -251,12 +255,12 @@ reads. The workflow uses the same donor label for each treatment pair.
 
 | Stage | What it does | Main output and check |
 | --- | --- | --- |
-| Download | Resolves each ENA run accession to paired FASTQ URLs, downloads both mates, and checks gzip integrity. | Keep the run accession-to-sample mapping from `analysis/airway_samples.tsv`; confirm each run yields both mates. |
-| fastp | Trims adapters and low-quality sequence from paired reads and generates per-sample QC. | Trimmed FASTQs plus fastp HTML/JSON under `qc/`; inspect retained read counts, quality, and adapter/quality trimming. |
-| Salmon reference setup | Downloads Ensembl 112 GRCh38 cDNA transcripts and matching GTF, builds the transcript index, and creates a transcript-to-gene map. | Index and `tx2gene.tsv`; the transcript FASTA and annotation must be from the same release/build. |
+| Download | Resolves each ENA run accession to paired FASTQ URLs, streams both mates to resumable partial files, and retries interrupted transfers. | Published `raw/` FASTQs and per-sample download manifests; byte count, ENA MD5, and gzip integrity are checked before publication. Keep the run accession-to-sample mapping from `analysis/airway_samples.tsv`. |
+| fastp | Trims adapters and low-quality sequence from paired reads and generates per-sample QC. | Trimmed FASTQs and HTML/JSON under `qc/`, plus `results/sample_qc_summary.tsv` with Q30 before/after filtering, retained reads, and Salmon mapping rates. |
+| Salmon reference setup | Downloads Ensembl 112 GRCh38 cDNA transcripts and matching GTF, builds the transcript index, and creates a transcript-to-gene map. | Persistent `reference/` outputs include the index, transcript FASTA, annotation, and `tx2gene.tsv`; the FASTA and annotation must be from the same release/build. |
 | Salmon quantification | Uses selective alignment with mapping validation plus sequence- and GC-bias correction to estimate transcript abundance for each library. | `quant/*.quant.sf` and auxiliary metadata; inspect mapping rates and library summaries. Quantification is not a genome variant call or gene-level significance test. |
 | MultiQC | Combines fastp JSON and Salmon auxiliary summaries across samples. | `multiqc/multiqc_report.html` and general statistics; this is a workflow/read/quantification QC report, not evidence of a treatment effect. |
-| tximport and DESeq2 | Aggregates transcript estimates to genes with the matching transcript map, removes genes with total counts below 10, and fits `~ cell + dex`; `untrt` is the reference level. | `results/deseq2_results.csv`, summary, and `session_info.txt`; each gene has effect estimate, uncertainty/statistic, raw p-value, and BH-adjusted p-value. |
+| tximport and DESeq2 | Aggregates transcript estimates to genes with the matching transcript map, removes genes with total counts below 10, and fits `~ cell + dex`; `untrt` is the reference level. | `results/deseq2_results.csv`, `results/normalized_counts.csv`, `results/gene_variance_diagnostics.csv`, summary, and `session_info.txt`; the diagnostics include normalized-count variance and fitted dispersion alongside effect estimate and standard error. |
 | Plots | Produces a PCA, MA plot, and volcano plot from the DESeq2 fit. | Interpret the PCA as exploratory sample structure; use MA for effect versus abundance; use the volcano plot for effect size versus adjusted evidence. None replaces the model or multiple-testing threshold. |
 
 For this run, the PCA’s first two components account for 52% and 37% of the
@@ -272,8 +276,10 @@ are acceptable; the transcript reference and gene annotation match; the model
 represents the experimental design; and the biological replicate count supports
 the intended inference. Keep the samplesheet, reference release, exact
 parameters, pipeline/container versions, MultiQC, DESeq2 table, and R session
-information together. The [analysis report](../PIPELINE_ANALYSIS.md) explains
-why each plot was selected and what its observed pattern means.
+information together. The saved normalized counts and variance/dispersion table
+make it possible to inspect genes whose expression varies strongly across
+samples. The [analysis report](../PIPELINE_ANALYSIS.md) explains why each plot
+was selected and what its observed pattern means.
 
 ### HG002 regional benchmark
 

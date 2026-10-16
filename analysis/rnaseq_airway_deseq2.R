@@ -52,6 +52,70 @@ result_table <- result_table[
 ]
 write.csv(result_table, "deseq2_results.csv", row.names = FALSE, na = "")
 
+normalized_counts <- counts(dds, normalized = TRUE)
+normalized_counts_table <- data.frame(
+  gene_id = rownames(normalized_counts),
+  normalized_counts,
+  check.names = FALSE,
+  row.names = NULL
+)
+write.csv(normalized_counts_table, "normalized_counts.csv", row.names = FALSE)
+
+gene_variance <- apply(normalized_counts, 1, var)
+variance_table <- data.frame(
+  gene_id = rownames(dds),
+  baseMean = rowMeans(normalized_counts),
+  normalized_count_variance = gene_variance,
+  dispersion = dispersions(dds),
+  log2FoldChange = result$log2FoldChange,
+  lfcSE = result$lfcSE,
+  check.names = FALSE
+)
+variance_table <- variance_table[order(
+  variance_table$normalized_count_variance,
+  decreasing = TRUE,
+  na.last = TRUE
+), ]
+write.csv(variance_table, "gene_variance_diagnostics.csv", row.names = FALSE, na = "")
+
+crispld2_id <- "ENSG00000103196"
+crispld2_row <- match(crispld2_id, rownames(normalized_counts))
+if (!is.na(crispld2_row)) {
+  crispld2_counts <- normalized_counts[crispld2_row, ]
+  donor_lines <- levels(sample_data$cell)
+  donor_colors <- grDevices::hcl.colors(length(donor_lines), palette = "Dark 3")
+  paired_counts <- unlist(lapply(donor_lines, function(donor) {
+    sample_names <- sample_data$sample[
+      sample_data$cell == donor & sample_data$dex %in% c("untrt", "trt")
+    ]
+    unname(crispld2_counts[sample_names])
+  }))
+  png("crispld2_paired_counts.png", width = 1200, height = 900, res = 150)
+  plot(
+    NA,
+    xlim = c(0.8, 2.2),
+    ylim = range(paired_counts, finite = TRUE) * c(0.75, 1.3),
+    log = "y",
+    xaxt = "n",
+    xlab = "Treatment",
+    ylab = "Normalized gene counts (log scale)",
+    main = "CRISPLD2 expression within donor pairs"
+  )
+  axis(1, at = c(1, 2), labels = c("Untreated", "Dexamethasone"))
+  for (i in seq_along(donor_lines)) {
+    donor <- donor_lines[[i]]
+    untrt_sample <- sample_data$sample[sample_data$cell == donor & sample_data$dex == "untrt"]
+    trt_sample <- sample_data$sample[sample_data$cell == donor & sample_data$dex == "trt"]
+    pair_values <- crispld2_counts[c(untrt_sample, trt_sample)]
+    lines(c(1, 2), pair_values, col = donor_colors[[i]], lwd = 2)
+    points(c(1, 2), pair_values, col = donor_colors[[i]], pch = 19, cex = 1.2)
+  }
+  legend("bottomright", legend = donor_lines, col = donor_colors, lty = 1, pch = 19, bty = "n", title = "Donor")
+  mtext("Three donor pairs increase; N061011 decreases. Four pairs give limited precision.",
+        side = 3, line = 0.25, cex = 0.8)
+  dev.off()
+}
+
 significant <- result_table[!is.na(result_table$padj) & result_table$padj < 0.05, ]
 upregulated <- sum(significant$log2FoldChange > 0)
 downregulated <- sum(significant$log2FoldChange < 0)

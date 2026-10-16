@@ -4,6 +4,9 @@ params.outdir = "results/rnaseq_airway_raw"
 params.samplesheet = "${projectDir}/analysis/airway_samples.tsv"
 params.threads = 2
 params.max_forks = 1
+params.download_forks = 4
+params.download_retries = 20
+params.download_timeout = 3600
 params.ensembl_release = "112"
 params.container_image = "seqcheckflow-rnaseq:latest"
 params.multiqc_container_image = "multiqc/multiqc:v1.27@sha256:b4c30167e87ecb120925792c20c4c98d06076dde5f6ba9af48dda792fa549225"
@@ -11,30 +14,95 @@ params.multiqc_container_image = "multiqc/multiqc:v1.27@sha256:b4c30167e87ecb120
 process DOWNLOAD_READS {
     container params.container_image
     cpus 1
-    maxForks params.max_forks
+    maxForks params.download_forks
+    publishDir "${params.outdir}/raw", mode: "copy"
 
     input:
     tuple val(meta), val(run)
 
     output:
-    tuple val(meta), path("read_1.fastq.gz"), path("read_2.fastq.gz")
+    tuple val(meta),
+          path("${meta.sample}_R1.fastq.gz"),
+          path("${meta.sample}_R2.fastq.gz"),
+          path("${meta.sample}.download.tsv")
 
     script:
     """
-    curl --retry 10 --retry-delay 10 --retry-max-time 600 -fsSL \\
-      'https://www.ebi.ac.uk/ena/portal/api/filereport?accession=${run}&result=read_run&fields=run_accession,fastq_ftp&format=tsv' \\
-      -o run_info.tsv
-    urls=\$(awk -F '\\t' 'NR == 2 { print \$2 }' run_info.tsv | tr ';' '\\n')
-    read1=\$(printf '%s\\n' "\$urls" | grep -E '_1\\.fastq\\.gz' | head -n 1)
-    read2=\$(printf '%s\\n' "\$urls" | grep -E '_2\\.fastq\\.gz' | head -n 1)
+    set -euo pipefail
+    read1_md5=''
+    read2_md5=''
+    read1_bytes=''
+    read2_bytes=''
+    if curl --retry 5 --retry-all-errors --retry-delay 3 --retry-max-time 120 -fsSL \\
+      'https://www.ebi.ac.uk/ena/portal/api/filereport?accession=${run}&result=read_run&fields=run_accession,fastq_ftp,fastq_md5,fastq_bytes&format=tsv' \\
+      -o run_info.tsv; then
+      IFS=';' read -r -a url_list <<< "\$(awk -F '\\t' 'NR == 2 { print \$2 }' run_info.tsv)"
+      IFS=';' read -r -a md5_list <<< "\$(awk -F '\\t' 'NR == 2 { print \$3 }' run_info.tsv)"
+      IFS=';' read -r -a size_list <<< "\$(awk -F '\\t' 'NR == 2 { print \$4 }' run_info.tsv)"
+      for index in "\${!url_list[@]}"; do
+        case "\${url_list[\$index]}" in
+          *_1.fastq.gz) read1="\${url_list[\$index]}"; read1_md5="\${md5_list[\$index]:-}"; read1_bytes="\${size_list[\$index]:-}" ;;
+          *_2.fastq.gz) read2="\${url_list[\$index]}"; read2_md5="\${md5_list[\$index]:-}"; read2_bytes="\${size_list[\$index]:-}" ;;
+        esac
+      done
+    else
+      case '${run}' in
+        SRR10395[0-9][0-9])
+          shard=00\$(printf '%s' '${run}' | rev | cut -c 1)
+          base="ftp.sra.ebi.ac.uk/vol1/fastq/SRR103/\$shard/${run}"
+          read1="\$base/${run}_1.fastq.gz"
+          read2="\$base/${run}_2.fastq.gz"
+          ;;
+        *)
+          echo "ENA metadata unavailable and no direct mirror fallback is configured for ${run}" >&2
+          exit 1
+          ;;
+      esac
+    fi
     if [ -z "\$read1" ] || [ -z "\$read2" ]; then
       echo "ENA did not provide paired FASTQ files for ${run}" >&2
       exit 1
     fi
-    curl --retry 10 --retry-delay 10 --retry-max-time 600 -fsSL "https://\$read1" -o read_1.fastq.gz
-    curl --retry 10 --retry-delay 10 --retry-max-time 600 -fsSL "https://\$read2" -o read_2.fastq.gz
-    gzip -t read_1.fastq.gz
-    gzip -t read_2.fastq.gz
+    download_with_resume() {
+      url=\$1
+      output=\$2
+      expected_bytes=\$3
+      expected_md5=\$4
+      part="\$output.part"
+      attempt=1
+      while ! curl --fail --location --retry 3 --retry-all-errors --retry-delay 5 \\
+        --connect-timeout 60 --max-time ${params.download_timeout} \\
+        --continue-at - --output "\$part" "https://\$url"; do
+        if (( attempt >= ${params.download_retries} )); then
+          echo "Download failed after \$attempt attempts: \$url" >&2
+          return 1
+        fi
+        attempt=\$((attempt + 1))
+        sleep 5
+      done
+      actual_bytes=\$(stat -c '%s' "\$part")
+      if [[ -n "\$expected_bytes" && "\$actual_bytes" != "\$expected_bytes" ]]; then
+        echo "Expected \$expected_bytes bytes from \$url, got \$actual_bytes" >&2
+        return 1
+      fi
+      gzip -t "\$part"
+      if [[ -n "\$expected_md5" ]]; then
+        printf '%s  %s\\n' "\$expected_md5" "\$part" | md5sum -c -
+      fi
+      mv "\$part" "\$output"
+    }
+
+    download_with_resume "\$read1" "${meta.sample}_R1.fastq.gz" "\$read1_bytes" "\$read1_md5"
+    download_with_resume "\$read2" "${meta.sample}_R2.fastq.gz" "\$read2_bytes" "\$read2_md5"
+    read1_bytes=\$(stat -c '%s' "${meta.sample}_R1.fastq.gz")
+    read2_bytes=\$(stat -c '%s' "${meta.sample}_R2.fastq.gz")
+    read1_md5=\$(md5sum "${meta.sample}_R1.fastq.gz" | cut -d ' ' -f 1)
+    read2_md5=\$(md5sum "${meta.sample}_R2.fastq.gz" | cut -d ' ' -f 1)
+    printf 'sample\\trun\\tread1_url\\tread2_url\\tread1_bytes\\tread2_bytes\\tread1_md5\\tread2_md5\\n' > '${meta.sample}.download.tsv'
+    printf '%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n' \\
+      '${meta.sample}' '${run}' "\$read1" "\$read2" \\
+      "\$read1_bytes" "\$read2_bytes" "\$read1_md5" "\$read2_md5" \\
+      >> '${meta.sample}.download.tsv'
     """
 }
 
@@ -45,7 +113,7 @@ process FASTP {
     publishDir "${params.outdir}/qc", mode: "copy", pattern: "*fastp.*"
 
     input:
-    tuple val(meta), path(read1), path(read2)
+    tuple val(meta), path(read1), path(read2), path(download_manifest)
 
     output:
     tuple val(meta),
@@ -71,10 +139,13 @@ process FASTP {
 process SALMON_INDEX {
     container params.container_image
     cpus params.threads
+    publishDir "${params.outdir}/reference", mode: "copy"
 
     output:
     path "salmon_index", emit: index
     path "tx2gene.tsv", emit: tx2gene
+    path "transcripts.fa"
+    path "annotation.gtf"
 
     script:
     """
@@ -169,6 +240,25 @@ process MULTIQC {
     """
 }
 
+process SAMPLE_QC_SUMMARY {
+    container params.container_image
+    publishDir "${params.outdir}/results", mode: "copy"
+
+    input:
+    path fastp_reports
+    path salmon_reports
+    path samplesheet
+
+    output:
+    path "sample_qc_summary.tsv"
+    path "sample_qc_plot.png"
+
+    script:
+    """
+    Rscript ${projectDir}/analysis/rnaseq_sample_qc.R ${samplesheet}
+    """
+}
+
 process DESEQ2 {
     container params.container_image
     publishDir "${params.outdir}/results", mode: "copy"
@@ -185,6 +275,9 @@ process DESEQ2 {
     path "volcano_plot.png"
     path "pca_plot.png"
     path "session_info.txt"
+    path "normalized_counts.csv"
+    path "gene_variance_diagnostics.csv"
+    path "crispld2_paired_counts.png"
     script:
     def sample_manifest = (0..<sample_meta.size()).collect { index ->
         def meta = sample_meta[index]
@@ -199,6 +292,9 @@ process DESEQ2 {
 workflow {
     if ((params.max_forks as Integer) < 1) {
         error "max_forks must be a positive integer."
+    }
+    if ((params.download_forks as Integer) < 1) {
+        error "download_forks must be a positive integer."
     }
     def samplesheet = Channel.fromPath(params.samplesheet, checkIfExists: true)
     def salmon_samples = samplesheet
@@ -216,12 +312,12 @@ workflow {
     salmon_index = SALMON_INDEX.out.index
     tx2gene = SALMON_INDEX.out.tx2gene
     SALMON_QUANT(FASTP.out.trimmed.combine(salmon_index))
-    MULTIQC(
-        FASTP.out.json.collect(),
-        SALMON_QUANT.out.quant
-            .map { meta, quant_file, salmon_report -> salmon_report }
-            .collect()
-    )
+    fastp_reports = FASTP.out.json.collect()
+    salmon_reports = SALMON_QUANT.out.quant
+        .map { meta, quant_file, salmon_report -> salmon_report }
+        .collect()
+    MULTIQC(fastp_reports, salmon_reports)
+    SAMPLE_QC_SUMMARY(fastp_reports, salmon_reports, file(params.samplesheet))
 
     quant_results = SALMON_QUANT.out.quant
         .map { meta, quant_file, salmon_report -> tuple(meta, quant_file) }

@@ -25,17 +25,38 @@ be treated as a new survey.
 
 | Analysis | Primary source and published claim | What our result says |
 | --- | --- | --- |
-| Airway RNA-seq | [Himes et al. 2014, PLOS ONE](https://doi.org/10.1371/journal.pone.0099625) analyzed the [GSE52778 GEO dataset](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE52778). Their four-donor dexamethasone experiment reported 316 genes with BH-adjusted *p* < 0.05 and followed up CRISPLD2 as a glucocorticoid-responsive gene. | Our eight-library reanalysis of those same four donor pairs reports zero genes at BH-adjusted *p* < 0.05 under Salmon/tximport/DESeq2 (`~ cell + dex`). Thus this run does **not reproduce the paper's transcriptome-wide significant-gene result**. It does not establish that the paper's biological hypothesis is false: this is a reanalysis with a different quantification/reference/statistical workflow, and failure to reach significance is not evidence of no effect. The generated gene-level table is not retained in this checkout, so this report cannot verify whether CRISPLD2's estimated direction agrees with the paper. |
+| Airway RNA-seq | [Himes et al. 2014, PLOS ONE](https://doi.org/10.1371/journal.pone.0099625) analyzed the [GSE52778 GEO dataset](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE52778). Their four-donor dexamethasone experiment reported 316 genes with BH-adjusted *p* < 0.05 and followed up CRISPLD2 as a glucocorticoid-responsive gene. | Our eight-library reanalysis of those same four donor pairs reports zero genes at BH-adjusted *p* < 0.05 under Salmon/tximport/DESeq2 (`~ cell + dex`). CRISPLD2 has a positive estimated log2 fold change (+2.06; raw *p* = 0.029), but high fitted dispersion (0.86), a large standard error (0.95), and BH-adjusted *p* = 0.9999. Its normalized counts rise in three donor pairs and fall in one. This run therefore does **not reproduce the paper's transcriptome-wide significant-gene result** and does not provide adjusted-significance evidence for CRISPLD2. It does not establish that the paper's biological hypothesis is false: the workflows differ, and the four donor pairs provide limited precision. |
 | HG002 variant benchmark | [Zook et al. 2019, Nature Biotechnology](https://doi.org/10.1038/s41587-019-0074-6) describes GIAB benchmark callsets for measuring small-variant pipeline accuracy; [NIST's benchmark FAQ](https://www.nist.gov/programs-projects/faqs-genome-bottle) explains their intended evaluation use and limits. | There is no biological hypothesis to accept or reject. Our operational check is whether wrappers reproduce direct tool calls and how both callsets score against GIAB truth in confident bases. Exact records match in the retained chr21 comparisons; accuracy is interval-specific and applies only to evaluated bases. The results support parity for these runs, not broad workflow validation. |
 | Single-file QC and summaries | These commands validate file structure and report format-specific measurements; they are software checks, not a reanalysis of a primary biological study. | They can report whether supported input structure checks passed and summarize properties such as read quality or alignment coverage. They do not test biological hypotheses or establish sample identity, variant truth, or clinical significance. |
 
-Accordingly, the RNA-seq result is **not a successful reproduction of the
-published differential-expression finding yet**. To make that comparison
-auditable, retain the gene-level results and compare the published 316-gene
-set and CRISPLD2 estimate (log2 fold change, adjusted *p*, and direction) under
-matched sample selection. Differences in reference annotation, quantification,
-model formula, and filtering should be recorded; they may explain disagreement
-but should not be assumed to do so without checking.
+The RNA-seq result is a completed reanalysis of GSE52778, not the HG002
+benchmark and not an exact recreation of the published computation. Its local
+outputs include the gene-level DESeq2 table, normalized counts, variance
+diagnostics, and session information. A direct comparison with the paper would
+still require matching sample selection and comparing its 316-gene set and
+CRISPLD2 estimate (log2 fold change, adjusted *p*, and direction). Differences
+in reference annotation, quantification, model formula, and filtering should
+be recorded and checked rather than assumed to explain the result.
+
+### Run the RNA-seq analysis locally
+
+From the repository root in Linux or WSL2, with Java 17, Nextflow 24.10.5, and
+Docker available, run:
+
+```bash
+docker build -f containers/rnaseq.Dockerfile -t seqcheckflow-rnaseq:latest .
+nextflow run main.nf -profile docker \
+  --samplesheet analysis/airway_samples.tsv \
+  --threads 2 \
+  --max_forks 1 \
+  --outdir results/rnaseq_airway
+```
+
+The workflow downloads the FASTQ files listed in the samplesheet, so the run
+needs internet access and substantial free disk space. It writes per-sample
+QC, MultiQC, DESeq2 tables, plots, and run logs under the selected output
+directory. To inspect the benchmark commands and their separate input
+requirements, see [Reproduce the HG002 benchmark results in the README](README.md#reproduce-the-hg002-benchmark-results).
 
 ### Do we have enough tools to reproduce the published RNA-seq analysis?
 
@@ -292,12 +313,12 @@ contrast is not a simple dominant axis shared identically across donors.
 
 | Stage | Purpose | Output / evidence to check |
 | --- | --- | --- |
-| ENA download | Fetch paired FASTQs for the eight run accessions in the sample sheet and verify gzip integrity. | Sample/run mapping and both read mates; a correct download does not validate sample labels or biological design. |
-| fastp | Trim adapters and low-quality sequence and produce per-library QC summaries. | Trimmed FASTQs and HTML/JSON reports; check read retention, quality, and adapter content before quantification. |
-| Salmon index | Build a transcript index from Ensembl 112 GRCh38 cDNA and derive transcript-to-gene mapping from the matching GTF. | Index plus `tx2gene.tsv`; keep the transcript reference and annotation release paired. |
+| ENA download | Stream paired FASTQs for the eight run accessions into resumable partial files; retry interrupted transfers and validate each completed mate. | Sample/run mapping, exact ENA byte count, MD5, gzip integrity, and a per-sample download manifest; a correct download does not validate biological labels or design. |
+| fastp | Trim adapters and low-quality sequence and produce per-library QC summaries. | Trimmed FASTQs, HTML/JSON reports, and `results/sample_qc_summary.tsv` with Q30 before/after filtering and reads retained; check read quality and adapter content before quantification. |
+| Salmon index | Build a transcript index from Ensembl 112 GRCh38 cDNA and derive transcript-to-gene mapping from the matching GTF. | Persistent `reference/` includes the index, transcript FASTA, GTF, and `tx2gene.tsv`; keep the transcript reference and annotation release paired. |
 | Salmon quantification | Selectively align reads to transcripts, validate mappings, and estimate abundance with sequence/GC bias correction. | `quant.sf` plus mapping/quantification metadata; mapping rate is a quantification QC measure, not differential-expression evidence. |
 | MultiQC | Combine fastp and Salmon auxiliary summaries across samples. | A single HTML overview for sample-level QC; it does not test the treatment effect. |
-| tximport / DESeq2 | Import transcript estimates at gene level, filter genes with total counts below 10, then fit `~ cell + dex` and estimate treated versus untreated while accounting for donor cell line. | Gene table with `baseMean`, `log2FoldChange`, standard error/statistic, raw `pvalue`, and BH-adjusted `padj`; summary and R session information. |
+| tximport / DESeq2 | Import transcript estimates at gene level, filter genes with total counts below 10, then fit `~ cell + dex` and estimate treated versus untreated while accounting for donor cell line. | Gene table with `baseMean`, `log2FoldChange`, standard error/statistic, raw `pvalue`, and BH-adjusted `padj`; normalized-count matrix, gene-variance/dispersion diagnostics, summary, and R session information. |
 
 The samplesheet pairs each donor cell line across untreated and treated
 conditions. With only four biological donors, estimates have limited precision.
@@ -343,12 +364,33 @@ why effect magnitude alone is not enough to call differential expression.
 The volcano plot complements the MA plot: it emphasizes evidence versus
 effect size, while the MA plot emphasizes effect size versus abundance.
 
+### Donor-paired CRISPLD2 expression
+
+![Normalized CRISPLD2 counts for untreated and dexamethasone-treated samples, connected within each donor pair](docs/images/airway-crispld2-paired.png)
+
+**Why this graph:** the paired points show how the estimated treatment
+direction differs across donors instead of hiding that variation in a single
+group summary. Counts are shown on a log scale because expression spans more
+than an order of magnitude. Three donor pairs increase and the N061011 pair
+decreases; this pattern helps explain the imprecise estimated log2 fold change
+(+2.06, standard error 0.95). The plot is descriptive and does not replace the
+DESeq2 model or its adjusted p-value (0.9999).
+
 ### Read and quantification quality
 
 The [MultiQC report](docs/reports/airway-multiqc.html) brings per-library
 fastp read-quality and Salmon mapping/quantification summaries into one place.
 It is included as a workflow-quality check, not as evidence for differential
 expression.
+
+![Per-sample post-fastp Q30 fraction and Salmon mapping percentage](docs/images/airway-sample-qc.png)
+
+**Why this graph:** it checks whether any library stands out in read quality or
+mapping before interpreting gene-level results. Post-fastp Q30 ranges from
+94.12% to 96.93%, and mapping rates range from 92.33% to 93.88%. These
+consistent ranges argue against a single obvious quality or mapping failure as
+the explanation for the expression pattern; they do not prove sample identity,
+adequate coverage at every transcript, or absence of other technical effects.
 
 ## Single-file QC: measures and limits
 
@@ -362,6 +404,39 @@ basic QC questions, not biological interpretation.
 | FASTQ | Read count, length/base-quality distributions, mean quality, GC, ambiguous bases, and reads below the mean Phred+33 cutoff. | Adapter removal, mate pairing across two files, mapping, or locus-level coverage. |
 | VCF / VCF.GZ | Record and contig counts, SNP/indel/other allele counts, filter categories, QUAL mean, sample names, and genotype counts. | Reference compatibility, truth-set accuracy, functional effect, or clinical significance. |
 | BAM / CRAM | Samtools integrity check, flagstat, stats, and coverage summaries; CRAM can be decoded with a supplied reference. | Variant calls, claimed sample identity, or accuracy without suitable truth evaluation. |
+
+For FASTQ, Phred quality is `Q = -10 log10(p)`, where `p` is the estimated
+probability of an incorrect base call; FASTQ quality characters here are decoded
+as Phred+33. This documents read-level sequencing uncertainty. It is distinct
+from RNA-seq differential-expression evidence, which is summarized by the
+estimated log2 fold change and its uncertainty and adjusted p-value.
+
+For the RNA-seq comparison, a log2 fold change is the estimated treated-to-
+untreated expression ratio on a base-2 logarithmic scale: `+1` is an estimated
+twofold increase, `-1` a twofold decrease, and `0` no estimated change. It is
+an effect-size estimate, not a significance score. DESeq2 models count
+variability (including gene-specific dispersion) when estimating uncertainty;
+genes with noisier counts can have less precise fold changes and weaker
+statistical evidence even when their estimated effect is large. The MA plot
+shows the spread of estimated effects, while the result table's `lfcSE`, raw
+`pvalue`, and BH-adjusted `padj` provide gene-level uncertainty and evidence.
+
+The rerun saves `results/sample_qc_summary.tsv`, `results/normalized_counts.csv`, and
+`results/gene_variance_diagnostics.csv` alongside `results/deseq2_results.csv`.
+These preserve each gene's normalized counts, across-sample variance, fitted
+dispersion, fold-change estimate, and standard error for review. In this run,
+FN1 (ENSG00000115414) had the largest absolute normalized-count variance
+(12.17 billion; mean 331,763). Its normalized counts ranged from about 207,865
+to 471,611 across the eight samples, while its fitted DESeq2 dispersion was
+0.0088 and its treatment estimate was small (log2 fold change 0.047, standard
+error 0.096, adjusted p-value 0.9999). This illustrates why absolute variance
+must be interpreted with expression level and the fitted mean-dispersion
+model. CRISPLD2 (ENSG00000103196) illustrates high relative variability more
+directly: its fitted dispersion is 0.86 and its standard error is 0.95. Its
+normalized treated counts are higher in three donor pairs but lower in the
+N061011 pair (about 8,714 untreated to 2,417 treated), which contributes to
+the imprecise treatment estimate. The donor-paired design accounts for
+baseline donor differences; neither gene was excluded from the model.
 
 A structurally valid input may still be unsuitable for a particular biological
 question. Keep the assembly, sample metadata, and a matching reference for CRAM
