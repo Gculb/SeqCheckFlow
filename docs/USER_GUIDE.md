@@ -300,6 +300,37 @@ charges. No cloud run is performed by this documentation or CI. The AWS
 profile is configuration support only until exercised in an account with the
 required infrastructure and permissions.
 
+## Machine requirements by analysis
+
+The table gives practical planning targets for a Linux host or WSL2 with Docker
+and Nextflow. Disk values mean free space available to the run, separate from
+the operating system. RNA-seq and whole-chromosome figures are conservative
+starting estimates, not measured minimums: the full RNA-seq run has not been
+profiled for peak resource use here, and whole-chromosome HG002 runs have not
+been validated end to end. Actual needs depend on read depth, concurrent tasks,
+filesystem overhead, and retained Nextflow work files.
+
+| Analysis | Practical starting point | Recommended machine | Notes |
+| --- | --- | --- | --- |
+| Single-file CLI on small FASTA/FASTQ/VCF examples | 2 CPU cores, 4 GB RAM; free disk at least 2× the input for temporary outputs | 4 cores, 8 GB RAM; extra disk for reports or converted files | BAM/CRAM work can use more disk and time; samtools must be installed for alignment summaries. |
+| Full eight-library RNA-seq (`main.nf`) | 4 cores, 16 GB RAM, 100 GB free disk | 8 cores, 32 GB RAM, 200 GB free disk | Internet required. Keep `--max_forks 1` and `--download_forks 2` on the smaller machine. Raw/trimmed reads and task intermediates make storage the main constraint. RAM and disk values are estimates pending a profiled full run. |
+| HG002 regional run (about 1 Mb) | 4 cores, 8 GB RAM, 30 GB free disk | 8 cores, 16 GB RAM, 60 GB free disk | Retained chr21 runs measured about 0.6 GiB peak sampled process-tree RSS and took about 19 minutes for the low-coverage interval. These are one-machine observations, not minimums or guarantees. |
+| HG002 whole chromosome | Start with 8 cores, 64 GB RAM, 200 GB task-local scratch | 16 cores, 128 GB RAM, 500 GB task-local scratch | Unvalidated planning estimates only. Run one chromosome at a time, inspect Nextflow trace and disk use, then adjust. AWS Batch must provide the requested memory and enough task-local scratch. |
+
+The full RNA-seq GitHub Actions job currently uses `ubuntu-latest`. GitHub lists
+standard `ubuntu-latest` public-repository runners as 4 CPUs, 16 GB RAM, and
+14 GB SSD; that runner's disk is below the local RNA-seq starting target, so a
+full run may run out of space even if CPU and RAM are adequate. Check the
+[current GitHub-hosted runner specifications](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)
+before relying on it. Use a local machine with adequate free disk or configured
+cloud compute for large runs. GitHub Actions validation/smoke jobs are much
+smaller than the full analyses.
+
+For reproducible sizing, record the host, free disk before and after, thread
+and concurrency settings, runtime, and Nextflow trace for each full run. Treat
+the first completed full run as a sizing baseline; the estimates above are not
+validated minimum requirements.
+
 ### RNA-seq workflow: stages, outputs, and interpretation
 
 The sample sheet has eight paired libraries: four airway smooth-muscle donor

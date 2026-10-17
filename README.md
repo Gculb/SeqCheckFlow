@@ -204,6 +204,13 @@ The full run downloads multiple public FASTQ files and needs additional disk
 space for reads, trimmed files, and the Salmon index. It produces a MultiQC
 report and DESeq2 results and plots.
 
+See the [machine requirements table](./docs/USER_GUIDE.md#machine-requirements-by-analysis)
+for practical starting and recommended specs for the CLI, full RNA-seq, and
+regional or whole-chromosome HG002 runs. The RNA-seq and whole-chromosome sizes
+are conservative estimates, not validated minimums. In particular, the current
+GitHub-hosted runner has less disk than the estimated local requirement for a
+full RNA-seq run.
+
 This is the complete eight-library GSE52778 dataset in the checked-in sample
 sheet; it is not downsampled. The GitHub Actions run can be tuned to two or four
 threads per fastp/Salmon task and one or two concurrent analysis tasks. To resume
