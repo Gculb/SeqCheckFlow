@@ -191,6 +191,51 @@ Choose an EC2 instance/storage configuration with enough memory and task-local
 disk for reference indexes and intermediate BAM/FASTQ files; the small default
 Batch instance disk may be insufficient for genomic workflows.
 
+#### AWS Batch minimum and recommended starting setups
+
+These are **candidate configurations for a first run**, not validated project
+minimums. The AWS Batch profile has not been exercised in an AWS account. EC2
+memory shown below is instance capacity; Batch also reserves host resources, so
+the container must request less than the instance's total memory. Instance
+types must be available in your selected region. See AWS's [EC2 instance
+specifications](https://docs.aws.amazon.com/ec2/latest/instancetypes/ec2-instance-types.html)
+and [Batch compute environment guidance](https://docs.aws.amazon.com/batch/latest/userguide/create-compute-environment.html).
+
+| Workload | Candidate minimum Batch setup | Recommended starting setup | Nextflow task memory |
+| --- | --- | --- | --- |
+| RNA-seq or ~1 Mb HG002 region | EC2 `m7i.xlarge` class (4 vCPU, 16 GiB); 100 GB encrypted gp3 EBS; Batch `minvCpus=0`, `maxvCpus=4` | `m7i.2xlarge` class (8 vCPU, 32 GiB); 200 GB encrypted gp3 EBS; allow up to 8 vCPUs | Keep the current 8 GB default. On the smaller setup, start with `--download_forks 1 --max_forks 1`. |
+| Full HG002 chromosome, one at a time | EC2 `r7i.4xlarge` class (16 vCPU, 128 GiB); 500 GB encrypted gp3 EBS; Batch `minvCpus=0`, `maxvCpus=16` | `r7i.8xlarge` class (32 vCPU, 256 GiB); 1 TB encrypted gp3 EBS; allow up to 32 vCPUs | Pass `--aws_batch_memory '64 GB'` and `--threads 8`. The 64 GB request is the workflow's per-task memory setting; select an instance with headroom above it. |
+
+The EC2 families above are examples: AWS lists `m7i.xlarge` at 4 vCPUs/16
+GiB and `m7i.2xlarge` at 8/32, while `r7i.4xlarge` is 16/128 and
+`r7i.8xlarge` is 32/256. Confirm regional availability and current prices
+before choosing. [AWS Batch launch templates](https://docs.aws.amazon.com/batch/latest/userguide/launch-templates.html)
+can increase the encrypted EBS data volume; the sizes in this table are
+starting allocations, not measured per-run disk consumption. S3 is the durable
+Nextflow work/results store, but tasks still need local scratch while running.
+
+For an initial setup, use a managed **EC2** compute environment, an existing
+VPC with outbound access to Batch/ECS, ECR, S3, CloudWatch Logs, and the public
+ENA/Ensembl/GIAB/UCSC/Broad endpoints required by the selected workflow; create
+a job queue attached to that environment; and use one same-region S3 bucket
+for `--work-dir` and results. Set the environment's minimum and desired vCPUs
+to zero so it can scale down when idle, and bound `maxvCpus` to the table's
+starting capacity. Follow AWS's [managed EC2 Batch setup
+guide](https://docs.aws.amazon.com/batch/latest/userguide/create-compute-environment-managed-ec2.html)
+and [launch template guide](https://docs.aws.amazon.com/batch/latest/userguide/launch-templates.html)
+to configure encrypted, adequately sized EBS. The driver needs Java,
+Nextflow, the `nf-amazon` plugin, AWS credentials, and the versioned images in
+ECR. The Batch compute instances need the instance profile, outbound network,
+and AWS CLI path described above. Keep credentials out of the repository; use
+scoped IAM roles and limit S3 access to the workflow prefixes.
+
+Start with On-Demand capacity and one workload. After collecting the Nextflow
+trace, job logs, and free-disk measurements, adjust the task memory, EBS size,
+and `maxvCpus`. Set an AWS Budget alert and use the [AWS Pricing
+Calculator](https://calculator.aws/) for the chosen region, instance hours,
+EBS, ECR, S3, and data transfer. A budget alert is a notification, not a hard
+spending cap. Avoid leaving nonzero desired capacity running after the analysis.
+
 For example, after creating ECR repositories and configuring AWS credentials,
 build and push versioned images from the repository root (replace the account,
 region, and tag):
