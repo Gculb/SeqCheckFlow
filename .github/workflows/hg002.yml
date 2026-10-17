@@ -2,6 +2,20 @@ name: SeqCheckFlow HG002 Nextflow benchmark
 
 on:
   workflow_dispatch:
+    inputs:
+      interval:
+        description: GRCh38 autosomal region; whole-chromosome runs need high-memory compute
+        required: true
+        default: chr20:10000000-11000000
+        type: string
+      threads:
+        description: Threads for alignment, recalibration, and variant calling
+        required: true
+        default: "2"
+        type: choice
+        options:
+          - "2"
+          - "4"
 
 permissions:
   contents: read
@@ -23,11 +37,14 @@ jobs:
         run: docker build -f containers/Dockerfile -t seqcheckflow:latest .
 
       - name: Prepare and run the HG002 pilot
+        env:
+          HG002_INTERVAL: ${{ inputs.interval || 'chr20:10000000-11000000' }}
+          HG002_THREADS: ${{ inputs.threads || '2' }}
         run: |
           nextflow run hg002.nf \
             -profile docker \
-            --interval chr20:10000000-11000000 \
-            --threads 2 \
+            --interval "${HG002_INTERVAL}" \
+            --threads "${HG002_THREADS}" \
             --outdir "${RUNNER_TEMP}/seqcheckflow-hg002-results" \
             -with-report "${RUNNER_TEMP}/hg002-nextflow-report.html" \
             -with-trace "${RUNNER_TEMP}/hg002-nextflow-trace.txt"

@@ -175,6 +175,14 @@ in PowerShell as shown below. See
 [the workflow and scaling notes](./ARCHITECTURE.md) before running larger data.
 An optional AWS Batch profile is documented in the [user guide](./docs/USER_GUIDE.md#aws-batch-execution-optional).
 
+To run all eight airway libraries through GitHub Actions, open **Actions →
+SeqCheckFlow RNA-seq → Run workflow**. The action saves the full results as a
+downloadable artifact. To run a chromosome interval, use **Actions → SeqCheckFlow
+HG002 Nextflow benchmark → Run workflow** and enter a GRCh38 interval. GitHub's
+hosted runner is intended for regional examples; use a high-memory local host or
+AWS Batch for a whole chromosome. People without write access can fork the
+repository, enable Actions on the fork, or run the documented commands locally.
+
 Raw-read RNA-seq:
 
 ```bash
@@ -195,6 +203,12 @@ independent, and the combined DESeq2 results are unchanged.
 The full run downloads multiple public FASTQ files and needs additional disk
 space for reads, trimmed files, and the Salmon index. It produces a MultiQC
 report and DESeq2 results and plots.
+
+This is the complete eight-library GSE52778 dataset in the checked-in sample
+sheet; it is not downsampled. The GitHub Actions run can be tuned to two or four
+threads per fastp/Salmon task and one or two concurrent analysis tasks. To resume
+completed local tasks after an interruption, add `-resume` to the same Nextflow
+command and keep the output path and `work/` directory.
 
 ### Reproduce the HG002 benchmark results
 
@@ -235,6 +249,28 @@ python scripts/seqcheckflow.py compare-hg002 `
 The comparison command intentionally refuses to overwrite results. If you run
 it again, change `$outdir` to a new name, such as
 `results/HG002_chr20_comparison_rerun2`.
+
+#### Whole-chromosome runs
+
+The HG002 Nextflow workflow accepts a single GRCh38 autosomal interval per run.
+For example, to run all of chromosome 21 on a suitably provisioned Linux/WSL2
+machine, use its full length (`46,709,983` bases):
+
+```bash
+nextflow run hg002.nf -profile docker \
+  --interval chr21:1-46709983 \
+  --threads 8 \
+  --outdir results/HG002_chr21_full
+```
+
+The workflow fetches the regional reads and matching reference/truth resources,
+then aligns, recalibrates, calls, and scores variants across that interval. It
+does not currently scatter a whole chromosome into subinterval tasks or combine
+all chromosomes into one workflow. To run all autosomes, repeat one full-
+chromosome run per contig, using the lengths in the UCSC GRCh38 chromosome sizes
+file. Whole-chromosome runs can require substantial task-local scratch space,
+memory, and wall time; the 1 Mb examples are the only retained end-to-end
+validation. Do not run the full-autosome loop on a standard GitHub-hosted runner.
 
 To run the separate stage-by-stage Nextflow DAG instead (it runs direct tools
 and truth-scoring, but does not produce the wrapper-versus-direct comparison

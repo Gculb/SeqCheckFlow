@@ -142,6 +142,15 @@ directory. A preview or synthetic R smoke test checks workflow/software wiring,
 not the full biological analysis. Full workflow runs are manual in GitHub
 Actions.
 
+This is the complete eight-library dataset in the checked-in sample sheet, not
+a subsample. To run it without a local Nextflow installation, use the GitHub
+**Actions → SeqCheckFlow RNA-seq → Run workflow** page; choose the threads and
+task-concurrency settings and download the `airway-raw-rnaseq-results` artifact
+when it completes. Users without write access to the main repository can fork
+it, enable Actions, and dispatch the workflow from their fork. The default
+GitHub-hosted runner is intended for this RNA-seq example, not whole-genome
+variant calling.
+
 This command reproduces **SeqCheckFlow's reanalysis**, not the original paper's
 exact computational pipeline. The paper used Taffeta, TopHat 2.0.4, Cufflinks
 and Cuffdiff 2.0.2, hg19 RefSeq plus ERCC references, and related legacy QC
@@ -238,6 +247,50 @@ nextflow run hg002.nf \
   --interval chr21:20000000-21000000 --threads 2 \
   --outdir s3://YOUR_BUCKET/seqcheckflow-results/hg002
 ```
+
+For a full-chromosome AWS Batch run, use a compute environment with enough
+memory and task-local disk for the whole interval, and increase the per-task
+memory request to match that environment. For example, replace the interval,
+thread, and output options in the HG002 launch above with:
+
+```bash
+  --interval chr21:1-46709983 --threads 8 \
+  --aws_batch_memory '64 GB' \
+  --outdir s3://YOUR_BUCKET/seqcheckflow-results/hg002_chr21_full
+```
+
+Keep the other launch options. AWS Batch must place a job requesting that
+memory on an instance that can satisfy it. Tune task-local storage too;
+increasing memory alone does not provision either resource.
+
+The HG002 Nextflow workflow accepts one GRCh38 autosomal interval per run. For
+a whole-chromosome chr21 run, the interval is `chr21:1-46709983`. On a high-
+memory Linux/WSL2 machine, build the image and run:
+
+```bash
+docker build -f containers/Dockerfile -t seqcheckflow:latest .
+nextflow run hg002.nf -profile docker \
+  --interval chr21:1-46709983 --threads 8 \
+  --outdir results/HG002_chr21_full
+```
+
+This example runs the complete chr21 interval through the existing preparation,
+alignment, BQSR, calling, and truth-scoring stages. The current workflow does
+not scatter a chromosome into smaller calling jobs or run all 22 autosomes in
+one invocation. To run all autosomes, use one full-contig interval per run; get
+each `chrN` length from the [UCSC hg38 chromosome sizes
+file](https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.chrom.sizes)
+and set the interval to `chrN:1-LENGTH`. Run chromosomes sequentially and use a
+unique output path for each. Whole chromosomes need substantially more scratch
+space, memory, and time than the documented 1 Mb pilots. The default GitHub
+runner is not a suitable whole-chromosome compute target.
+
+For AWS Batch, the `awsbatch` profile defaults to 8 GB per task. Set
+`--aws_batch_memory '64 GB'` (or the size supported by your configured compute
+environment) for whole-chromosome tasks. This memory setting does not create or
+resize Batch resources; configure the queue's EC2 instances and task-local disk
+to match the workload. The Batch profile has not been validated in a live AWS
+account.
 
 The S3 work prefix stores task intermediates and can become large; the result
 prefix contains published outputs. Set an S3 lifecycle policy appropriate for

@@ -4,6 +4,23 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      threads:
+        description: Threads per fastp/Salmon task
+        required: true
+        default: "2"
+        type: choice
+        options:
+          - "2"
+          - "4"
+      max_forks:
+        description: Concurrent fastp/Salmon sample tasks
+        required: true
+        default: "1"
+        type: choice
+        options:
+          - "1"
+          - "2"
 
 permissions:
   contents: read
@@ -53,11 +70,15 @@ jobs:
         run: docker build -f containers/rnaseq.Dockerfile -t seqcheckflow-rnaseq:latest .
 
       - name: Run raw-read differential-expression workflow
+        env:
+          RNA_THREADS: ${{ inputs.threads || '2' }}
+          RNA_MAX_FORKS: ${{ inputs.max_forks || '1' }}
         run: |
           nextflow run main.nf \
             -profile docker \
             --outdir "${RUNNER_TEMP}/seqcheckflow-rnaseq-raw-results" \
-            --threads 2 \
+            --threads "${RNA_THREADS}" \
+            --max_forks "${RNA_MAX_FORKS}" \
             -with-report "${RUNNER_TEMP}/nextflow-report.html" \
             -with-trace "${RUNNER_TEMP}/nextflow-trace.txt"
 
@@ -71,6 +92,11 @@ jobs:
           test -s "${results}/multiqc/multiqc_general_stats.txt"
           test -s "${results}/results/deseq2_results.csv"
           test -s "${results}/results/analysis_summary.txt"
+          test -s "${results}/results/sample_qc_summary.tsv"
+          test -s "${results}/results/sample_qc_plot.png"
+          test -s "${results}/results/normalized_counts.csv"
+          test -s "${results}/results/gene_variance_diagnostics.csv"
+          test -s "${results}/results/crispld2_paired_counts.png"
           test -s "${results}/results/ma_plot.png"
           test -s "${results}/results/volcano_plot.png"
           test -s "${results}/results/pca_plot.png"
