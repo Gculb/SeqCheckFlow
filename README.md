@@ -217,6 +217,36 @@ threads per fastp/Salmon task and one or two concurrent analysis tasks. To resum
 completed local tasks after an interruption, add `-resume` to the same Nextflow
 command and keep the output path and `work/` directory.
 
+### Approximate AWS Batch costs
+
+These are planning estimates for Linux On-Demand compute in `us-east-1`, using
+the candidate instance sizes in the [AWS resource guide](./docs/USER_GUIDE.md#aws-batch-minimum-and-recommended-starting-setups).
+AWS Batch itself has no additional charge; compute time is billed while EC2
+instances are running. [AWS EC2 On-Demand pricing](https://aws.amazon.com/ec2/pricing/on-demand/)
+and [AWS Batch pricing](https://aws.amazon.com/batch/pricing/) describe the
+billing model. Rates below are approximate list rates; verify the current
+region-specific prices in the [AWS Pricing Calculator](https://calculator.aws/)
+before launching.
+
+| Run | Assumed compute time and instance | Approximate compute + short-lived gp3 storage |
+| --- | --- | ---: |
+| HG002 ~1 Mb region | 1–2 hours on `m7i.xlarge` (~$0.20/hour) | **$0.25–$0.50** |
+| Full eight-library RNA-seq | 4–8 hours on `m7i.2xlarge` (~$0.40/hour) | **$2–$4** |
+| One full chromosome, candidate setup | 5–20 hours on `r7i.4xlarge` (~$1.06/hour) | **$6–$23** |
+| One full chromosome, recommended setup | 5–20 hours on `r7i.8xlarge` (~$2.12/hour) | **$11–$45** |
+
+The run times are illustrative assumptions, not measurements from AWS; the full
+RNA-seq and whole-chromosome runs have not been profiled on Batch. Full-
+chromosome costs can exceed these ranges if a run takes longer or retries.
+The estimates exclude NAT Gateway charges, variable internet traffic, S3
+storage retained after the run, ECR storage, CloudWatch logs, and taxes. In
+regions where the NAT Gateway rate is $0.045/hour, leaving one running all month
+adds about **$33/month**, plus data processing charges; see [AWS VPC
+pricing](https://aws.amazon.com/vpc/pricing/). gp3 volume pricing is based on
+provisioned capacity and time ([EBS pricing](https://aws.amazon.com/ebs/pricing/)).
+To keep a one-off run inexpensive, set Batch capacity to scale to zero and
+remove temporary S3 work data when it is no longer needed.
+
 ### Reproduce the HG002 benchmark results
 
 Run from the repository root in PowerShell with Docker Desktop running. The
